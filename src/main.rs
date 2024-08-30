@@ -1,7 +1,6 @@
 use std::path::PathBuf;
 
 use clap::Parser;
-// use lox::execute;
 use anyhow::Result;
 
 #[derive(Parser)]
@@ -10,8 +9,8 @@ struct Args {
 }
 
 fn main () -> Result<()>  {
-    // let args = Args::parse();
-    // println!("File argument is {}", args.file_path.display());
-    // execute(&args.file_path)?;
+    let args = Args::parse();
+    println!("File argument is {}", args.file_path.display());
+    lox::execute(&args.file_path)?;
     Ok(())
 }
