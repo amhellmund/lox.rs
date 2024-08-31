@@ -1,11 +1,8 @@
-use anyhow::{Result, bail};
+use std::path::PathBuf;
 
-/// Location in the code file
-#[derive(Clone, Copy, PartialEq, Debug)]
-pub struct Location {
-    line: i64,
-    column: i64,
-}
+use anyhow::Result;
+
+use crate::diagnostics::{Location, DiagnosticError};
 
 /// Wrapper around a sequence of characters providing convenience functions:
 /// 
@@ -126,13 +123,15 @@ impl Token {
 struct Tokenizer {
     content: CharSequence,
     tokens: Vec<Token>,
+    source_file: PathBuf,
 }
 
 impl Tokenizer {
-    pub fn new (content: &str) -> Self {
+    pub fn new (content: &str, source_file: PathBuf) -> Self {
         let tokenizer = Tokenizer {
             content: CharSequence::new(content),
             tokens: Vec::new(),
+            source_file: source_file,
         };
         tokenizer
     }
@@ -170,7 +169,11 @@ impl Tokenizer {
                             self.content.advance(1);
                         }
                         else {
-                            bail!("Invalid character detected: '{}' [{}:{}]", def_char, self.content.location.line, self.content.location.column,);
+                            return Err(DiagnosticError::new(
+                                format!("Invalid character detected: '{}'", def_char),
+                                self.content.location,
+                                self.source_file,
+                            ).into());
                         }
                     }
                 }
@@ -275,7 +278,11 @@ impl Tokenizer {
                 break;
             }
             else if ch == '\n' {
-                bail!("Unfinished string literal [{},{}]", self.content.location.line, self.content.location.column);
+                return Err(DiagnosticError::new(
+                    format!("Unfinished string literal: '{}'", lexeme),
+                    self.content.location,
+                    self.source_file.clone(),
+                ).into());
             }
             lexeme.push(ch);
             pos += 1;
@@ -292,8 +299,8 @@ impl Tokenizer {
     }
 }
 
-pub fn tokenize (input: &str) -> Result<Vec<Token>> {
-    let tokenizer = Tokenizer::new(input);
+pub fn tokenize (input: &str, source_file: PathBuf) -> Result<Vec<Token>> {
+    let tokenizer = Tokenizer::new(input, source_file);
     let tokens = tokenizer.tokenize()?;
     Ok(tokens)
 }

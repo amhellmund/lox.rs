@@ -5,6 +5,8 @@
     a = "after";
     print a; // expect: after
 
+    "dfsdf
+
     print a = "arg";
     print a; // expect:
 }
