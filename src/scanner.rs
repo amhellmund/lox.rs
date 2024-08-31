@@ -106,7 +106,7 @@ pub struct Token {
     lexeme: String,
 }
 
-pub struct Tokenizer {
+struct Tokenizer {
     content: CharSequence,
     tokens: Vec<Token>,
 }
@@ -120,62 +120,60 @@ impl Tokenizer {
         tokenizer
     }
 
-    pub fn tokenize (&mut self) -> Result<&Vec<Token>> {
-        if self.tokens.len() == 0 {
-            while self.content.has_reached_end() == false {
-                if let Some(ch) = self.content.look_at(0) {
-                    match ch {
-                        '(' => self.add_single_char_token(ch, TokenType::LeftParanthesis),
-                        ')' => self.add_single_char_token(ch, TokenType::RightParanthesis),
-                        '{' => self.add_single_char_token(ch, TokenType::LeftBrace),
-                        '}' => self.add_single_char_token(ch, TokenType::RightBrace),
-                        ',' => self.add_single_char_token(ch, TokenType::Comma),
-                        '.' => self.add_single_char_token(ch, TokenType::Dot),
-                        '-' => self.add_single_char_token(ch, TokenType::Minus),
-                        '+' => self.add_single_char_token(ch, TokenType::Plus),
-                        ';' => self.add_single_char_token(ch, TokenType::Semicolon),
-                        '*' => self.add_single_char_token(ch, TokenType::Star),
-                        '!' => self.add_comparison_token(ch, TokenType::Bang, TokenType::BangEqual),
-                        '=' => self.add_comparison_token(ch, TokenType::Equal, TokenType::EqualEqual),
-                        '>' => self.add_comparison_token(ch, TokenType::Greater, TokenType::GreaterOrEqual),
-                        '<' => self.add_comparison_token(ch, TokenType::Less, TokenType::LessOrEqual),
-                        '/' => self.add_slash_token_or_ignore_line_comment(),
-                        def_char => {
-                            if def_char.is_digit(10) {
-                                self.add_number_token();
-                            }
-                            else if def_char.is_ascii_alphabetic() {
-                                self.add_identifier_or_keyword_token();
-                            }
-                            else if def_char == '"' {
-                                self.add_string_literal_token()?;
-                            }
-                            else if def_char.is_whitespace() {
-                                self.content.advance(1);
-                            }
-                            else {
-                                bail!("Invalid character detected: '{}' [{}:{}]", def_char, self.content.location.line, self.content.location.column,);
-                            }
+    pub fn tokenize (mut self) -> Result<Vec<Token>> {
+        while self.content.has_reached_end() == false {
+            if let Some(ch) = self.content.look_at(0) {
+                match ch {
+                    '(' => self.process_single_char_token(ch, TokenType::LeftParanthesis),
+                    ')' => self.process_single_char_token(ch, TokenType::RightParanthesis),
+                    '{' => self.process_single_char_token(ch, TokenType::LeftBrace),
+                    '}' => self.process_single_char_token(ch, TokenType::RightBrace),
+                    ',' => self.process_single_char_token(ch, TokenType::Comma),
+                    '.' => self.process_single_char_token(ch, TokenType::Dot),
+                    '-' => self.process_single_char_token(ch, TokenType::Minus),
+                    '+' => self.process_single_char_token(ch, TokenType::Plus),
+                    ';' => self.process_single_char_token(ch, TokenType::Semicolon),
+                    '*' => self.process_single_char_token(ch, TokenType::Star),
+                    '!' => self.process_comparison_token(ch, TokenType::Bang, TokenType::BangEqual),
+                    '=' => self.process_comparison_token(ch, TokenType::Equal, TokenType::EqualEqual),
+                    '>' => self.process_comparison_token(ch, TokenType::Greater, TokenType::GreaterOrEqual),
+                    '<' => self.process_comparison_token(ch, TokenType::Less, TokenType::LessOrEqual),
+                    '/' => self.process_slash_token_or_ignore_line_comment(),
+                    def_char => {
+                        if def_char.is_digit(10) {
+                            self.add_number_token();
+                        }
+                        else if def_char.is_ascii_alphabetic() {
+                            self.add_identifier_or_keyword_token();
+                        }
+                        else if def_char == '"' {
+                            self.add_string_literal_token()?;
+                        }
+                        else if def_char.is_whitespace() {
+                            self.content.advance(1);
+                        }
+                        else {
+                            bail!("Invalid character detected: '{}' [{}:{}]", def_char, self.content.location.line, self.content.location.column,);
                         }
                     }
                 }
             }
         }
-        Ok(&self.tokens)
+        Ok(self.tokens)
     }
 
-    fn add_single_char_token (&mut self, ch: char, token_type: TokenType) {
+    fn add_token (&mut self, token_type: TokenType, location: Location, lexeme: String) {
         self.tokens.push(
-            Token{
-                token_type,
-                location: self.content.location,
-                lexeme: String::from(ch),
-            }
-        );
+            Token { token_type, location, lexeme }
+        )
+    }
+
+    fn process_single_char_token (&mut self, ch: char, token_type: TokenType) {
+        self.add_token(token_type, self.content.location, String::from(ch));
         self.content.advance(1);
     }
 
-    fn add_comparison_token(&mut self, ch: char, token_type_no_equal: TokenType, token_type_equal: TokenType) {
+    fn process_comparison_token(&mut self, ch: char, token_type_no_equal: TokenType, token_type_equal: TokenType) {
         let mut token_type = token_type_no_equal;
         let mut lexeme = String::from(ch);
         let mut token_length = 1;
@@ -185,18 +183,12 @@ impl Tokenizer {
             lexeme.push('=');
             token_length = 2;
         }
-
-        self.tokens.push(
-            Token{
-                token_type: token_type,
-                location: self.content.location,
-                lexeme,
-            }
-        );
+        
+        self.add_token(token_type, self.content.location, lexeme);
         self.content.advance(token_length);
     }
 
-    fn add_slash_token_or_ignore_line_comment(&mut self) {
+    fn process_slash_token_or_ignore_line_comment(&mut self) {
         if let Some('/') = self.content.look_at(1) {
             let mut pos = 2usize;
             while let Some(ch) = self.content.look_at(pos) {
@@ -208,13 +200,7 @@ impl Tokenizer {
             self.content.advance(pos + 1);
         }
         else {
-            self.tokens.push(
-                Token {
-                    token_type: TokenType::Slash,
-                    location: self.content.location,
-                    lexeme: String::from('/'),
-                }
-            );
+            self.add_token(TokenType::Slash, self.content.location, String::from('/'));
             self.content.advance(1);
         }
     }
@@ -229,13 +215,7 @@ impl Tokenizer {
             lexeme.push(ch);
             pos += 1;
         }
-        self.tokens.push(
-            Token{
-                token_type: TokenType::Number,
-                location: self.content.location,
-                lexeme,
-            }
-        );
+        self.add_token(TokenType::Number, self.content.location, lexeme);
         self.content.advance(pos);
     }
 
@@ -249,13 +229,7 @@ impl Tokenizer {
             lexeme.push(ch);
             pos += 1;
         }
-        self.tokens.push(
-            Token{
-                token_type: TokenType::Identifier,
-                location: self.content.location,
-                lexeme,
-            }
-        );
+        self.add_token(TokenType::Identifier, self.content.location, lexeme);
         self.content.advance(pos);
     }
 
@@ -284,10 +258,16 @@ impl Tokenizer {
     }
 }
 
+pub fn tokenize (input: &str) -> Result<Vec<Token>> {
+    let tokenizer = Tokenizer::new(input);
+    let tokens = tokenizer.tokenize()?;
+    Ok(tokens)
+}
+
 
 #[cfg(test)]
 mod tests {
-    use super::{CharSequence, Location};
+    use super::{CharSequence, Location, tokenize, Token, TokenType};
 
     fn construct_char_sequence (input: &str) -> CharSequence {
         CharSequence::new(input)
@@ -332,4 +312,66 @@ mod tests {
         assert_eq!(seq.location, Location{line: 2, column: 1});
         assert_eq!(seq.look_at(0), Some('h'));
     }
+
+    #[test]
+    fn test_scanner_elementary_tokens() {
+        let test_data = vec![
+            ("(", TokenType::LeftParanthesis),
+            (")", TokenType::RightParanthesis),
+            ("{", TokenType::LeftBrace),
+            ("}", TokenType::RightBrace),
+            (",", TokenType::Comma),
+            (".", TokenType::Dot),
+            ("-", TokenType::Minus),
+            ("+", TokenType::Plus),
+            (";", TokenType::Semicolon),
+            ("*", TokenType::Star),
+            ("!", TokenType::Bang),
+            ("!=", TokenType::BangEqual),
+            ("=", TokenType::Equal),
+            ("==", TokenType::EqualEqual),
+            (">", TokenType::Greater),
+            (">=", TokenType::GreaterOrEqual),
+            ("<", TokenType::Less),
+            ("<=", TokenType::LessOrEqual),
+            ("/", TokenType::Slash),
+        ];
+
+        for (input, token_type) in test_data {
+            let tokens = tokenize(input).unwrap();
+            assert_eq!(tokens.len(), 1);
+
+            let token = &tokens[0];
+            assert_eq!(token.token_type, token_type);
+            assert_eq!(token.location, Location { line: 1, column: 1});
+            assert_eq!(token.lexeme, input);
+        }
+    }
+
+    #[test]
+    fn test_number_tokens () {
+        let test_data = vec![
+            "1",
+            "23",
+            "456",
+            "1.2",
+            "4.",
+            "0.25",
+        ];
+        for input in test_data {
+            let tokens = tokenize(input).unwrap();
+            assert_eq!(tokens.len(), 1);
+
+            let token = &tokens[0];
+            assert_eq!(token.token_type, TokenType::Number);
+            assert_eq!(token.location, Location { line: 1, column: 1});
+            assert_eq!(token.lexeme, input);
+        }
+
+        let tokens = tokenize(".25").unwrap();
+        assert_eq!(tokens.len(), 2);
+        assert_eq!(tokens[0].token_type, TokenType::Dot);
+        assert_eq!(tokens[1].token_type, TokenType::Number);  
+    }
+    
 }

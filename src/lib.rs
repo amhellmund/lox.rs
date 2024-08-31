@@ -9,8 +9,8 @@ pub fn execute(file_path: &Path) -> Result<()> {
     let content = fs::read_to_string(file_path)
         .with_context(|| format!("Failed to read file {}", file_path.display()))?;
 
-    let mut tokenizer = scanner::Tokenizer::new(&content);
-    dbg!(tokenizer.tokenize()?);
+    let tokens = scanner::tokenize(&content)?;
+    dbg!(tokens);
     Ok(())
 }
 
