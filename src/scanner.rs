@@ -99,11 +99,24 @@ pub enum TokenType {
 
 
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct Token {
     token_type: TokenType,
     location: Location,
     lexeme: String,
+}
+
+impl Token {
+    fn new (token_type: TokenType, line: i64, column: i64, lexeme: String) -> Self {
+        Token {
+            token_type,
+            location: Location {
+                line,
+                column,
+            },
+            lexeme,
+        }
+    }
 }
 
 struct Tokenizer {
@@ -268,6 +281,7 @@ pub fn tokenize (input: &str) -> Result<Vec<Token>> {
 #[cfg(test)]
 mod tests {
     use super::{CharSequence, Location, tokenize, Token, TokenType};
+    use textwrap::dedent;
 
     fn construct_char_sequence (input: &str) -> CharSequence {
         CharSequence::new(input)
@@ -367,11 +381,61 @@ mod tests {
             assert_eq!(token.location, Location { line: 1, column: 1});
             assert_eq!(token.lexeme, input);
         }
+    }
 
+    #[test]
+    fn test_numbers_with_leading_dot_as_two_tokens () {
         let tokens = tokenize(".25").unwrap();
         assert_eq!(tokens.len(), 2);
         assert_eq!(tokens[0].token_type, TokenType::Dot);
-        assert_eq!(tokens[1].token_type, TokenType::Number);  
+        assert_eq!(tokens[1].token_type, TokenType::Number); 
+    }
+
+    #[test]
+    fn test_string_literal () {
+        let tokens = tokenize("\"literal\"").unwrap();
+        assert_eq!(tokens.len(), 1);
+        assert_eq!(tokens[0].token_type, TokenType::StringLiteral);
+        assert_eq!(tokens[0].lexeme, "literal");
+    }
+
+    #[test]
+    fn test_string_literal_uncompleted () {
+        let tokens = tokenize("\"literal\n\"");
+        assert!(tokens.is_err());
+    }
+
+    #[test]
+    fn test_comment () {
+        let tokens = tokenize("12 // comment").unwrap();
+        assert_eq!(tokens.len(), 1);
+    }
+
+    #[test]
+    fn test_multiple_tokens_with_multiple_lines () {
+        let input = dedent(r#"
+            12 + 4; // comment
+            {
+                "abc";
+            }"#);
+        let testdata = vec![
+            Token::new(TokenType::Number, 2, 1, String::from("12")),
+            Token::new(TokenType::Plus, 2, 4, String::from("+")),
+            Token::new(TokenType::Number, 2, 6, String::from("4")),
+            Token::new(TokenType::Semicolon, 2, 7, String::from(";")),
+            Token::new(TokenType::LeftBrace, 3, 1, String::from("{")),
+            Token::new(TokenType::StringLiteral, 4, 5, String::from("abc")),
+            Token::new(TokenType::Semicolon, 4, 10, String::from(";")),
+            Token::new(TokenType::RightBrace, 5, 1, String::from("}")),
+        ];
+
+        let tokens = tokenize(&input).unwrap();
+
+        assert_eq!(tokens.len(), testdata.len());
+
+        for (i, token) in tokens.iter().enumerate() {
+            assert_eq!(token, &testdata[i]);
+        }
     }
     
 }
