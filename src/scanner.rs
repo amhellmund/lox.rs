@@ -308,6 +308,8 @@ pub fn tokenize (input: &str, source_file: PathBuf) -> Result<Vec<Token>> {
 
 #[cfg(test)]
 mod tests {
+    use std::{path::PathBuf, str::FromStr};
+
     use super::{CharSequence, Location, tokenize, Token, TokenType};
     use textwrap::dedent;
 
@@ -363,7 +365,7 @@ mod tests {
     }
 
     fn assert_tokens(input: &str, expected_tokens: Vec<Token>) {
-        let tokens = tokenize(input).unwrap();
+        let tokens = tokenize(input, PathBuf::from_str("in-memory").unwrap()).unwrap();
         assert_eq!(tokens.len(), expected_tokens.len());
         for (index, token) in tokens.iter().enumerate() {
             assert_eq!(token, &expected_tokens[index]);
@@ -443,7 +445,7 @@ mod tests {
 
     #[test]
     fn test_string_literal_uncompleted () {
-        let tokens = tokenize("\"literal\n\"");
+        let tokens = tokenize("\"literal\n\"", PathBuf::from_str("in-memory").unwrap());
         assert!(tokens.is_err());
     }
 
