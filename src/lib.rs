@@ -13,7 +13,7 @@ pub fn execute(file_path: &Path) -> Result<()> {
         .with_context(|| format!("Failed to read file {}", file_path.display()))?;
 
     let tokens = scanner::tokenize(&content, file_path.to_path_buf())?;
-    let ast = parser::parse(&tokens);
+    let ast = parser::parse(&tokens, file_path.to_path_buf()).with_context(|| "Failed to parse the input file")?;
     let ast_as_string = print_ast(&ast);
     dbg!(&ast_as_string);
     Ok(())

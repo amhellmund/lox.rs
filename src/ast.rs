@@ -5,6 +5,15 @@ pub enum UnaryOperator {
     Not,
 }
 
+impl ToString for UnaryOperator {
+    fn to_string(&self) -> String {
+        match *self {
+            UnaryOperator::Minus => String::from("-"),
+            UnaryOperator::Not => String::from("!"),
+        }
+    }
+}
+
 pub enum BinaryOperator {
     Add,
     Substract,
@@ -16,6 +25,23 @@ pub enum BinaryOperator {
     GreaterThanOrEqual,
     Equal,
     NotEqual,
+}
+
+impl ToString for BinaryOperator {
+    fn to_string(&self) -> String {
+        match *self {
+            BinaryOperator::Add => String::from("+"),
+            BinaryOperator::Substract => String::from("-"),
+            BinaryOperator::Multiply => String::from("*"),
+            BinaryOperator::Divide => String::from("/"),
+            BinaryOperator::Equal => String::from("=="),
+            BinaryOperator::NotEqual => String::from("!="),
+            BinaryOperator::GreaterThan => String::from(">"),
+            BinaryOperator::GreaterThanOrEqual => String::from(">="),
+            BinaryOperator::LessThan => String::from("<"),
+            BinaryOperator::LessThanOrEqual => String::from("<="),
+        }
+    }
 }
 
 pub enum Literal {
@@ -36,4 +62,7 @@ pub enum Expr {
         expr: Box<Expr>,
     },
     Literal(Literal),
+    Grouping {
+        expr: Box<Expr>,
+    }
 }

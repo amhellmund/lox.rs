@@ -58,7 +58,7 @@ impl CharSequence {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum TokenType {
     LeftParanthesis,
     RightParanthesis,
@@ -102,11 +102,11 @@ pub enum TokenType {
 
 
 /// Token as an atomic element of the programming language
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct Token {
-    token_type: TokenType,
-    location: Location,
-    lexeme: String,
+    pub token_type: TokenType,
+    pub location: Location,
+    pub lexeme: String,
 }
 
 impl Token {
