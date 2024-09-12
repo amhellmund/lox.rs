@@ -9,6 +9,11 @@ pub struct Location {
     pub column: i64,
 }
 
+pub struct LocationSpan {
+    pub start: Location,
+    pub end_inclusive: Location,
+}
+
 #[derive(Debug)]
 pub struct DiagnosticError {
     pub message: String,

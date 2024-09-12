@@ -1,3 +1,5 @@
+use crate::diagnostics::LocationSpan;
+
 pub mod printer;
 
 pub enum UnaryOperator {
@@ -56,13 +58,19 @@ pub enum Expr {
         lhs: Box<Expr>,
         op: BinaryOperator,
         rhs: Box<Expr>,
+        loc: LocationSpan,
     },
     Unary {
         op: UnaryOperator,
         expr: Box<Expr>,
+        loc: LocationSpan,
     },
-    Literal(Literal),
+    Literal {
+        literal: Literal,
+        loc: LocationSpan,
+    },
     Grouping {
         expr: Box<Expr>,
+        loc: LocationSpan,
     }
 }

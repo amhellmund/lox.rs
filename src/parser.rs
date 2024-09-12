@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
 use crate::ast::{BinaryOperator, Expr, Literal, UnaryOperator};
-use crate::diagnostics::{DiagnosticError, Location};
+use crate::diagnostics::{DiagnosticError, Location, LocationSpan};
 use crate::scanner::{Token, TokenType};
 use anyhow::Result;
 
@@ -99,6 +99,13 @@ impl<'a> Parser<'a> {
                 lhs: Box::new(expr),
                 op,
                 rhs: Box::new(rhs),
+                loc: LocationSpan {
+                    start: 
+                    end_inclusive: Location {
+                        line: 0,
+                        column: 0,
+                    }
+                }
             }
         }
         Ok(expr)
