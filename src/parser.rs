@@ -95,17 +95,15 @@ impl<'a> Parser<'a> {
             self.tokens.advance();
             let rhs = parse_fn(self)?;
 
+            let loc = LocationSpan {
+                start: expr.get_loc().start,
+                end_inclusive: rhs.get_loc().end_inclusive,
+            };
             expr = Expr::Binary {
                 lhs: Box::new(expr),
                 op,
                 rhs: Box::new(rhs),
-                loc: LocationSpan {
-                    start: 
-                    end_inclusive: Location {
-                        line: 0,
-                        column: 0,
-                    }
-                }
+                loc,
             }
         }
         Ok(expr)
@@ -159,13 +157,19 @@ impl<'a> Parser<'a> {
         if self.tokens.current_has_token_type(&token_types) {
             let token = self.tokens.current().unwrap();
             let op = get_unary_operator_from_token_type(&token.token_type);
+            let start_loc = token.location,
             
             self.tokens.advance();
             let expr = self.parse_primary()?;
+            let loc = LocationSpan {
+                start: start_loc,
+                end_inclusive: expr.get_loc().end_inclusive(),
+            };
             Ok(
                 Expr::Unary { 
                     op,
                     expr: Box::new(expr),
+                    loc,
                 }
             )
         }
@@ -176,9 +180,15 @@ impl<'a> Parser<'a> {
 
     fn parse_primary (&mut self) -> Result<Expr> {
         if let Some(token) = self.tokens.current() {
+            let start_loc = token.location;
             self.tokens.advance();
             let expr: Result<Expr> = match token.token_type {
-                TokenType::True => Ok(Expr::Literal(Literal::Boolean(true))),
+                TokenType::True => Ok(
+                    Expr::Literal {
+                        literal: Literal::Boolean(true)),
+                        loc: LocationSpan {
+                            start: start_loc
+                        }
                 TokenType::False => Ok(Expr::Literal(Literal::Boolean(false))),
                 TokenType::Nil => Ok(Expr::Literal(Literal::Nil)),
                 TokenType::StringLiteral => Ok(Expr::Literal(Literal::String(String::from(&token.lexeme)))),

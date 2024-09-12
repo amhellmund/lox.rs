@@ -74,3 +74,14 @@ pub enum Expr {
         loc: LocationSpan,
     }
 }
+
+impl Expr {
+    pub fn get_loc (&self) -> &LocationSpan {
+        match self {
+            Expr::Binary { loc, .. } => loc,
+            Expr::Unary { loc, .. } => loc,
+            Expr::Grouping { loc, .. } => loc,
+            Expr::Literal { loc, .. } => loc,
+        }
+    }
+}
