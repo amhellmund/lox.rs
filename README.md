@@ -1,2 +1,2 @@
 # lox.rs
-Rust implementation for for Lox language (from Crafting Interpreters)
+Rust implementation for the Lox language (from Crafting Interpreters)
