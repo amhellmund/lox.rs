@@ -2,10 +2,10 @@ use std::path::PathBuf;
 
 use anyhow::Result;
 
-use crate::diagnostics::{Location, DiagnosticError};
+use crate::diagnostics::{DiagnosticError, FileLocation, Location};
 
 /// Wrapper around a sequence of characters providing convenience functions:
-/// 
+///
 ///   o Look at characters from the current position in the sequence
 ///   o Advance position while updating the location information
 ///   o End-of-sequence check
@@ -16,45 +16,40 @@ struct CharSequence {
 }
 
 impl CharSequence {
-    fn new (chars: &str) -> Self {
+    fn new(chars: &str) -> Self {
         Self {
             chars: chars.chars().collect(),
             pos: 0,
-            location: Location { 
-                line: 1,
-                column: 1,
-            }
+            location: Location::new(1, 1),
         }
     }
 
-    fn look_at (&self, num: usize) -> Option<char> {
+    fn look_at(&self, num: usize) -> Option<char> {
         let index = self.pos + num;
         if index < self.chars.len() {
             Some(self.chars[index])
-        }
-        else {
+        } else {
             None
         }
     }
 
-    fn advance (&mut self, num: usize) {
+    fn advance(&mut self, num: usize) {
         for _ in 0..num {
             if self.pos < self.chars.len() {
-               let ch = self.chars[self.pos]; 
-               if ch == '\n' {
+                let ch = self.chars[self.pos];
+                if ch == '\n' {
                     self.location.line += 1;
                     self.location.column = 1;
-                }
-                else if ch != '\r' {
+                } else if ch != '\r' {
                     self.location.column += 1;
                 }
                 self.pos += 1;
-            }    
+            }
         }
     }
 
-    fn has_reached_end (&self) -> bool {
-        return self.pos >= self.chars.len()
+    fn has_reached_end(&self) -> bool {
+        return self.pos >= self.chars.len();
     }
 }
 
@@ -100,7 +95,6 @@ pub enum TokenType {
     While,
 }
 
-
 /// Token as an atomic element of the programming language
 #[derive(Debug, PartialEq, Clone)]
 pub struct Token {
@@ -110,7 +104,7 @@ pub struct Token {
 }
 
 impl Token {
-    fn new (token_type: TokenType, location: Location, lexeme: String) -> Self {
+    fn new(token_type: TokenType, location: Location, lexeme: String) -> Self {
         Token {
             token_type,
             location,
@@ -127,7 +121,7 @@ struct Tokenizer {
 }
 
 impl Tokenizer {
-    pub fn new (content: &str, source_file: PathBuf) -> Self {
+    pub fn new(content: &str, source_file: PathBuf) -> Self {
         let tokenizer = Tokenizer {
             content: CharSequence::new(content),
             tokens: Vec::new(),
@@ -136,7 +130,7 @@ impl Tokenizer {
         tokenizer
     }
 
-    pub fn tokenize (mut self) -> Result<Vec<Token>> {
+    pub fn tokenize(mut self) -> Result<Vec<Token>> {
         while self.content.has_reached_end() == false {
             if let Some(ch) = self.content.look_at(0) {
                 match ch {
@@ -151,29 +145,34 @@ impl Tokenizer {
                     ';' => self.process_single_char_token(ch, TokenType::Semicolon),
                     '*' => self.process_single_char_token(ch, TokenType::Star),
                     '!' => self.process_comparison_token(ch, TokenType::Bang, TokenType::BangEqual),
-                    '=' => self.process_comparison_token(ch, TokenType::Equal, TokenType::EqualEqual),
-                    '>' => self.process_comparison_token(ch, TokenType::Greater, TokenType::GreaterOrEqual),
-                    '<' => self.process_comparison_token(ch, TokenType::Less, TokenType::LessOrEqual),
+                    '=' => {
+                        self.process_comparison_token(ch, TokenType::Equal, TokenType::EqualEqual)
+                    }
+                    '>' => self.process_comparison_token(
+                        ch,
+                        TokenType::Greater,
+                        TokenType::GreaterOrEqual,
+                    ),
+                    '<' => {
+                        self.process_comparison_token(ch, TokenType::Less, TokenType::LessOrEqual)
+                    }
                     '/' => self.process_slash_token_or_ignore_line_comment(),
                     def_char => {
                         if def_char.is_digit(10) {
                             self.process_number_token();
-                        }
-                        else if def_char.is_ascii_alphabetic() {
+                        } else if def_char.is_ascii_alphabetic() {
                             self.process_identifier_or_keyword_token();
-                        }
-                        else if def_char == '"' {
+                        } else if def_char == '"' {
                             self.process_string_literal_token()?;
-                        }
-                        else if def_char.is_whitespace() {
+                        } else if def_char.is_whitespace() {
                             self.content.advance(1);
-                        }
-                        else {
+                        } else {
                             return Err(DiagnosticError::new(
                                 format!("Invalid character detected: '{}'", def_char),
-                                self.content.location,
+                                FileLocation::SinglePoint(self.content.location),
                                 self.source_file,
-                            ).into());
+                            )
+                            .into());
                         }
                     }
                 }
@@ -182,26 +181,31 @@ impl Tokenizer {
         Ok(self.tokens)
     }
 
-    fn add_token (&mut self, token_type: TokenType, location: Location, lexeme: String) {
+    fn add_token(&mut self, token_type: TokenType, location: Location, lexeme: String) {
         self.tokens.push(Token::new(token_type, location, lexeme));
     }
 
-    fn process_single_char_token (&mut self, ch: char, token_type: TokenType) {
+    fn process_single_char_token(&mut self, ch: char, token_type: TokenType) {
         self.add_token(token_type, self.content.location, String::from(ch));
         self.content.advance(1);
     }
 
-    fn process_comparison_token(&mut self, ch: char, token_type_no_equal: TokenType, token_type_equal: TokenType) {
+    fn process_comparison_token(
+        &mut self,
+        ch: char,
+        token_type_no_equal: TokenType,
+        token_type_equal: TokenType,
+    ) {
         let mut token_type = token_type_no_equal;
         let mut lexeme = String::from(ch);
         let mut token_length = 1;
-        
+
         if let Some('=') = self.content.look_at(1) {
             token_type = token_type_equal;
             lexeme.push('=');
             token_length = 2;
         }
-        
+
         self.add_token(token_type, self.content.location, lexeme);
         self.content.advance(token_length);
     }
@@ -211,13 +215,12 @@ impl Tokenizer {
             let mut pos = 2usize;
             while let Some(ch) = self.content.look_at(pos) {
                 if ch == '\n' {
-                    break
+                    break;
                 }
                 pos += 1;
             }
             self.content.advance(pos + 1);
-        }
-        else {
+        } else {
             self.add_token(TokenType::Slash, self.content.location, String::from('/'));
             self.content.advance(1);
         }
@@ -270,62 +273,56 @@ impl Tokenizer {
         self.content.advance(pos);
     }
 
-    fn process_string_literal_token (&mut self) -> Result<()> {
+    fn process_string_literal_token(&mut self) -> Result<()> {
         let mut lexeme = String::new();
         let mut pos = 1usize;
         while let Some(ch) = self.content.look_at(pos) {
             if ch == '"' {
                 break;
-            }
-            else if ch == '\n' {
+            } else if ch == '\n' {
                 return Err(DiagnosticError::new(
                     format!("Unfinished string literal: '{}'", lexeme),
-                    self.content.location,
+                    FileLocation::SinglePoint(self.content.location),
                     self.source_file.clone(),
-                ).into());
+                )
+                .into());
             }
             lexeme.push(ch);
             pos += 1;
         }
-        self.tokens.push(
-            Token{
-                token_type: TokenType::StringLiteral,
-                location: self.content.location,
-                lexeme,
-            }
-        );
+        self.tokens.push(Token {
+            token_type: TokenType::StringLiteral,
+            location: self.content.location,
+            lexeme,
+        });
         self.content.advance(pos + 1);
         Ok(())
     }
 }
 
-pub fn tokenize (input: &str, source_file: PathBuf) -> Result<Vec<Token>> {
+pub fn tokenize(input: &str, source_file: PathBuf) -> Result<Vec<Token>> {
     let tokenizer = Tokenizer::new(input, source_file);
     let tokens = tokenizer.tokenize()?;
     Ok(tokens)
 }
 
-
 #[cfg(test)]
 mod tests {
     use std::{path::PathBuf, str::FromStr};
 
-    use super::{CharSequence, Location, tokenize, Token, TokenType};
+    use super::{tokenize, CharSequence, Location, Token, TokenType};
     use textwrap::dedent;
 
-    fn construct_char_sequence (input: &str) -> CharSequence {
+    fn construct_char_sequence(input: &str) -> CharSequence {
         CharSequence::new(input)
     }
 
-    fn new_loc (line: i64, column: i64) -> Location {
-        Location {
-            line,
-            column,
-        }
+    fn new_loc(line: i64, column: i64) -> Location {
+        Location { line, column }
     }
 
     #[test]
-    fn test_char_sequence_empty_sequence () {
+    fn test_char_sequence_empty_sequence() {
         let seq = construct_char_sequence("");
         assert_eq!(seq.look_at(0), None);
         assert_eq!(seq.has_reached_end(), true);
@@ -373,11 +370,7 @@ mod tests {
     }
 
     fn new_token(token_type: TokenType, location: Location, lexeme: String) -> Token {
-        Token::new(
-            token_type,
-            location,
-            lexeme,
-        )
+        Token::new(token_type, location, lexeme)
     }
 
     #[test]
@@ -405,59 +398,71 @@ mod tests {
         ];
 
         for (input, token_type) in test_data {
-            assert_tokens(input, vec![
-                new_token(token_type, new_loc(1, 1), input.to_string())
-            ]);
+            assert_tokens(
+                input,
+                vec![new_token(token_type, new_loc(1, 1), input.to_string())],
+            );
         }
     }
 
     #[test]
-    fn test_number_tokens () {
-        let test_data = vec![
-            "1",
-            "23",
-            "456",
-            "1.2",
-            "4.",
-            "0.25",
-        ];
+    fn test_number_tokens() {
+        let test_data = vec!["1", "23", "456", "1.2", "4.", "0.25"];
         for input in test_data {
-            assert_tokens(input, vec![
-                new_token(TokenType::Number, new_loc(1, 1), input.to_string())
-            ]);
+            assert_tokens(
+                input,
+                vec![new_token(
+                    TokenType::Number,
+                    new_loc(1, 1),
+                    input.to_string(),
+                )],
+            );
         }
     }
 
     #[test]
-    fn test_numbers_with_leading_dot_as_two_tokens () {
-        assert_tokens(".25", vec![
-            new_token(TokenType::Dot, new_loc(1, 1), String::from(".")),
-            new_token(TokenType::Number, new_loc(1, 2), String::from("25")),
-        ]); 
+    fn test_numbers_with_leading_dot_as_two_tokens() {
+        assert_tokens(
+            ".25",
+            vec![
+                new_token(TokenType::Dot, new_loc(1, 1), String::from(".")),
+                new_token(TokenType::Number, new_loc(1, 2), String::from("25")),
+            ],
+        );
     }
 
     #[test]
-    fn test_string_literal () {
-        assert_tokens("\"literal\"", vec![
-            new_token(TokenType::StringLiteral, new_loc(1, 1), String::from("literal")),
-        ]);
+    fn test_string_literal() {
+        assert_tokens(
+            "\"literal\"",
+            vec![new_token(
+                TokenType::StringLiteral,
+                new_loc(1, 1),
+                String::from("literal"),
+            )],
+        );
     }
 
     #[test]
-    fn test_string_literal_uncompleted () {
+    fn test_string_literal_uncompleted() {
         let tokens = tokenize("\"literal\n\"", PathBuf::from_str("in-memory").unwrap());
         assert!(tokens.is_err());
     }
 
     #[test]
-    fn test_comment () {
-        assert_tokens("12 // comment", vec![
-            new_token(TokenType::Number, new_loc(1, 1), String::from("12")),
-        ])
+    fn test_comment() {
+        assert_tokens(
+            "12 // comment",
+            vec![new_token(
+                TokenType::Number,
+                new_loc(1, 1),
+                String::from("12"),
+            )],
+        )
     }
 
     #[test]
-    fn test_keywords () {
+    fn test_keywords() {
         let testdata = vec![
             ("and", TokenType::And),
             ("class", TokenType::Class),
@@ -478,39 +483,40 @@ mod tests {
         ];
 
         for (input, token_type) in testdata {
-            assert_tokens(input, vec![
-                new_token(token_type, new_loc(1, 1), input.to_string()),
-            ]);
+            assert_tokens(
+                input,
+                vec![new_token(token_type, new_loc(1, 1), input.to_string())],
+            );
         }
     }
 
     #[test]
-    fn test_identifier () {
-        let testdata = vec![
-            "a",
-            "ab",
-            "abc",
-            "a1b",
-            "a_1",
-            "a_",
-        ];
+    fn test_identifier() {
+        let testdata = vec!["a", "ab", "abc", "a1b", "a_1", "a_"];
 
         for input in testdata {
-            assert_tokens(input, vec![
-                new_token(TokenType::Identifier, new_loc(1, 1), input.to_string()),
-            ]);
+            assert_tokens(
+                input,
+                vec![new_token(
+                    TokenType::Identifier,
+                    new_loc(1, 1),
+                    input.to_string(),
+                )],
+            );
         }
     }
 
     #[test]
-    fn test_multiple_tokens_with_multiple_lines () {
-        let input = dedent(r#"
+    fn test_multiple_tokens_with_multiple_lines() {
+        let input = dedent(
+            r#"
             12 + 4; // comment
             {
                 print "abc";
             }
             var b_ = nil;
-            "#);
+            "#,
+        );
         let testdata = vec![
             new_token(TokenType::Number, new_loc(2, 1), String::from("12")),
             new_token(TokenType::Plus, new_loc(2, 4), String::from("+")),
@@ -518,7 +524,11 @@ mod tests {
             new_token(TokenType::Semicolon, new_loc(2, 7), String::from(";")),
             new_token(TokenType::LeftBrace, new_loc(3, 1), String::from("{")),
             new_token(TokenType::Print, new_loc(4, 5), String::from("print")),
-            new_token(TokenType::StringLiteral, new_loc(4, 11), String::from("abc")),
+            new_token(
+                TokenType::StringLiteral,
+                new_loc(4, 11),
+                String::from("abc"),
+            ),
             new_token(TokenType::Semicolon, new_loc(4, 16), String::from(";")),
             new_token(TokenType::RightBrace, new_loc(5, 1), String::from("}")),
             new_token(TokenType::Var, new_loc(6, 1), String::from("var")),
@@ -529,5 +539,4 @@ mod tests {
         ];
         assert_tokens(input.as_str(), testdata);
     }
-    
 }

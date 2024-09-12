@@ -72,11 +72,11 @@ pub enum Expr {
     Grouping {
         expr: Box<Expr>,
         loc: LocationSpan,
-    }
+    },
 }
 
 impl Expr {
-    pub fn get_loc (&self) -> &LocationSpan {
+    pub fn get_loc(&self) -> &LocationSpan {
         match self {
             Expr::Binary { loc, .. } => loc,
             Expr::Unary { loc, .. } => loc,
