@@ -21,7 +21,7 @@ impl ToString for Location {
     }
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(PartialEq, Debug, Copy, Clone)]
 pub struct LocationSpan {
     pub start: Location,
     pub end_inclusive: Location,

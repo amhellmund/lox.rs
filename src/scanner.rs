@@ -104,7 +104,7 @@ pub struct Token {
 }
 
 impl Token {
-    fn new(token_type: TokenType, location: Location, lexeme: String) -> Self {
+    pub fn new(token_type: TokenType, location: Location, lexeme: String) -> Self {
         Token {
             token_type,
             location,

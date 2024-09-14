@@ -2,6 +2,7 @@ use crate::diagnostics::LocationSpan;
 
 pub mod printer;
 
+#[derive(PartialEq, Debug)]
 pub enum UnaryOperator {
     Minus,
     Not,
@@ -16,6 +17,7 @@ impl ToString for UnaryOperator {
     }
 }
 
+#[derive(PartialEq, Debug)]
 pub enum BinaryOperator {
     Add,
     Substract,
@@ -46,6 +48,7 @@ impl ToString for BinaryOperator {
     }
 }
 
+#[derive(PartialEq, Debug)]
 pub enum Literal {
     Number(f64),
     String(String),
@@ -53,6 +56,7 @@ pub enum Literal {
     Nil,
 }
 
+#[derive(PartialEq, Debug)]
 pub enum Expr {
     Binary {
         lhs: Box<Expr>,
