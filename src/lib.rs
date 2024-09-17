@@ -1,4 +1,5 @@
 use anyhow::{Context, Result};
+use ast::eval::eval_expr;
 use ast::printer::print_ast;
 use std::fs;
 use std::path::Path;
@@ -15,7 +16,9 @@ pub fn execute(file_path: &Path) -> Result<()> {
     let tokens = scanner::tokenize(&content, file_path.to_path_buf())?;
     let ast = parser::parse(&tokens, file_path.to_path_buf())
         .with_context(|| "Failed to parse the input file")?;
+    let expr_value = eval_expr(&ast, file_path.to_path_buf())?;
     let ast_as_string = print_ast(&ast);
     println!("AST:\n{}", ast_as_string);
+    println!("Expr: {}", expr_value.to_string());
     Ok(())
 }

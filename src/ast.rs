@@ -1,5 +1,6 @@
 use crate::diagnostics::LocationSpan;
 
+pub mod eval;
 pub mod printer;
 
 #[derive(PartialEq, Debug)]

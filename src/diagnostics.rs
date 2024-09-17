@@ -48,7 +48,7 @@ impl LocationSpan {
 #[derive(Debug, Copy, Clone)]
 pub enum FileLocation {
     SinglePoint(Location),
-    //Span(LocationSpan),
+    Span(LocationSpan),
     EndOfFile,
 }
 
@@ -56,7 +56,7 @@ impl ToString for FileLocation {
     fn to_string(&self) -> String {
         match *self {
             FileLocation::SinglePoint(point) => point.to_string(),
-            //FileLocation::Span(span) => span.to_string(),
+            FileLocation::Span(span) => span.to_string(),
             FileLocation::EndOfFile => String::from("eof"),
         }
     }
@@ -97,15 +97,15 @@ impl fmt::Display for DiagnosticError {
                     point.to_string(),
                 )
             }
-            // FileLocation::Span(span) => {
-            //     write!(
-            //         f,
-            //         "{} [{}@{}] ",
-            //         self.message,
-            //         self.get_source_file_name(),
-            //         span.to_string(),
-            //     )
-            // }
+            FileLocation::Span(span) => {
+                write!(
+                    f,
+                    "{} [{}@{}] ",
+                    self.message,
+                    self.get_source_file_name(),
+                    span.to_string(),
+                )
+            }
             FileLocation::EndOfFile => {
                 write!(f, "{} [{}] ", self.message, self.get_source_file_name(),)
             }
