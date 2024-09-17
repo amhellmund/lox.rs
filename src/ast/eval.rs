@@ -33,7 +33,7 @@ impl ToString for ExprValue {
             ExprValue::Boolean(value) => value.to_string(),
             ExprValue::Nil => String::from("nil"),
             ExprValue::Number(value) => value.to_string(),
-            ExprValue::String(value) => value.to_string(),
+            ExprValue::String(value) => format!("\"{}\"", value.to_string()),
         }
     }
 }

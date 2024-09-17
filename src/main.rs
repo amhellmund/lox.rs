@@ -5,12 +5,15 @@ use clap::Parser;
 
 #[derive(Parser)]
 struct Args {
-    file_path: PathBuf,
+    file_path: Option<PathBuf>,
 }
 
 fn main() -> Result<()> {
     let args = Args::parse();
-    println!("File argument is {}", args.file_path.display());
-    lox::execute(&args.file_path)?;
-    Ok(())
+    if let Some(file_path) = args.file_path {
+        println!("File argument is {}", file_path.display());
+        lox::execute(&file_path, false)
+    } else {
+        lox::repl()
+    }
 }
