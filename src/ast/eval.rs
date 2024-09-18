@@ -9,6 +9,7 @@ use crate::{
 
 use super::{BinaryOperator, UnaryOperator};
 
+#[derive(PartialEq, Debug)]
 pub enum ExprValue {
     Number(f64),
     String(String),
@@ -246,5 +247,113 @@ impl ExprEvaluator {
             self.source_file.clone(),
         )
         .into();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::path::PathBuf;
+
+    use super::{eval_expr, ExprValue};
+    use crate::ast::{BinaryOperator, Expr, Literal};
+    use crate::diagnostics::{Location, LocationSpan};
+    use anyhow::Result;
+
+    fn default_loc_span() -> LocationSpan {
+        LocationSpan {
+            start: Location::new(1, 1),
+            end_inclusive: Location::new(1, 1),
+        }
+    }
+
+    fn new_literal_expr(literal: Literal) -> Expr {
+        Expr::Literal {
+            literal: literal,
+            loc: default_loc_span(),
+        }
+    }
+
+    fn run_eval(expr: &Expr) -> Result<ExprValue> {
+        eval_expr(expr, PathBuf::from("in-memory"))
+    }
+
+    #[test]
+    fn test_eval_from_literal_ast() {
+        let test_data = vec![
+            (Literal::Number(10.0), ExprValue::Number(10.0)),
+            (
+                Literal::String(String::from("abc")),
+                ExprValue::String(String::from("abc")),
+            ),
+            (Literal::Boolean(true), ExprValue::Boolean(true)),
+            (Literal::Boolean(false), ExprValue::Boolean(false)),
+            (Literal::Nil, ExprValue::Nil),
+        ];
+
+        for (literal, expected_value) in test_data {
+            let ast = new_literal_expr(literal);
+            let value = run_eval(&ast).unwrap();
+            assert_eq!(value, expected_value);
+        }
+    }
+
+    fn new_binary_expr_number(op: BinaryOperator, lhs: f64, rhs: f64) -> Expr {
+        Expr::Binary {
+            lhs: Box::new(new_literal_expr(Literal::Number(lhs))),
+            op,
+            rhs: Box::new(new_literal_expr(Literal::Number(rhs))),
+            loc: default_loc_span(),
+        }
+    }
+
+    #[test]
+    fn test_eval_binary_operator_number() {
+        let test_data = vec![
+            (
+                new_binary_expr_number(BinaryOperator::Add, 10.0, 20.0),
+                ExprValue::Number(30.0),
+            ),
+            (
+                new_binary_expr_number(BinaryOperator::Substract, 1.0, 2.0),
+                ExprValue::Number(-1.0),
+            ),
+            (
+                new_binary_expr_number(BinaryOperator::Multiply, 1.5, 8.0),
+                ExprValue::Number(12.0),
+            ),
+            (
+                new_binary_expr_number(BinaryOperator::Divide, 42.0, 6.0),
+                ExprValue::Number(7.0),
+            ),
+            (
+                new_binary_expr_number(BinaryOperator::Equal, 1.0, 1.2),
+                ExprValue::Boolean(false),
+            ),
+            (
+                new_binary_expr_number(BinaryOperator::NotEqual, 1.0, 1.2),
+                ExprValue::Boolean(true),
+            ),
+            (
+                new_binary_expr_number(BinaryOperator::GreaterThan, 2.5, 2.4),
+                ExprValue::Boolean(true),
+            ),
+            (
+                new_binary_expr_number(BinaryOperator::GreaterThanOrEqual, 2.5, 2.6),
+                ExprValue::Boolean(false),
+            ),
+            (
+                new_binary_expr_number(BinaryOperator::LessThan, 2.0, 2.4),
+                ExprValue::Boolean(true),
+            ),
+            (
+                new_binary_expr_number(BinaryOperator::LessThanOrEqual, 2.4, 2.4),
+                ExprValue::Boolean(true),
+            ),
+        ];
+
+        for (ast, expected_value) in test_data {
+            let value = run_eval(&ast).unwrap();
+            assert_eq!(value, expected_value);
+        }
     }
 }
