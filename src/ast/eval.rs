@@ -503,14 +503,48 @@ mod tests {
 
     #[test]
     fn test_eval_with_errors() {
-        let test_data = vec![(
-            new_binary_expr(
-                BinaryOperator::Add,
-                new_literal_expr(Literal::Number(10.0)),
-                new_literal_expr(Literal::String("abc".into())),
+        let test_data = vec![
+            (
+                new_binary_expr(
+                    BinaryOperator::Add,
+                    new_literal_expr(Literal::Number(10.0)),
+                    new_literal_expr(Literal::String("abc".into())),
+                ),
+                "Binary operator '+' only supported for",
             ),
-            "Binary operator '+' only supported for",
-        )];
+            (
+                new_binary_expr(
+                    BinaryOperator::Add,
+                    new_literal_expr(Literal::String("abc".into())),
+                    new_literal_expr(Literal::Number(10.0)),
+                ),
+                "Binary operator '+' only supported for",
+            ),
+            (
+                new_binary_expr(
+                    BinaryOperator::Substract,
+                    new_literal_expr(Literal::String("abc".into())),
+                    new_literal_expr(Literal::String("abc".into())),
+                ),
+                "Binary operator '-' not supported",
+            ),
+            (
+                new_binary_expr(
+                    BinaryOperator::Multiply,
+                    new_literal_expr(Literal::String("abc".into())),
+                    new_literal_expr(Literal::String("abc".into())),
+                ),
+                "Binary operator '*' not supported",
+            ),
+            (
+                new_binary_expr(
+                    BinaryOperator::Divide,
+                    new_literal_expr(Literal::String("abc".into())),
+                    new_literal_expr(Literal::String("abc".into())),
+                ),
+                "Binary operator '/' not supported",
+            ),
+        ];
 
         run_test_eval_with_expected_errors(test_data);
     }
