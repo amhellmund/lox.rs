@@ -257,7 +257,6 @@ mod tests {
     use super::{eval_expr, ExprValue};
     use crate::ast::{BinaryOperator, Expr, Literal, UnaryOperator};
     use crate::diagnostics::{Location, LocationSpan};
-    use anyhow::Result;
 
     fn default_loc_span() -> LocationSpan {
         LocationSpan {
@@ -273,46 +272,82 @@ mod tests {
         }
     }
 
-    fn run_eval(expr: &Expr) -> Result<ExprValue> {
-        eval_expr(expr, PathBuf::from("in-memory"))
+    fn new_binary_expr(op: BinaryOperator, lhs: Expr, rhs: Expr) -> Expr {
+        Expr::Binary {
+            lhs: Box::new(lhs),
+            op,
+            rhs: Box::new(rhs),
+            loc: default_loc_span(),
+        }
+    }
+
+    fn new_binary_expr_number(op: BinaryOperator, lhs: f64, rhs: f64) -> Expr {
+        new_binary_expr(
+            op,
+            new_literal_expr(Literal::Number(lhs)),
+            new_literal_expr(Literal::Number(rhs)),
+        )
+    }
+
+    fn new_binary_expr_str(op: BinaryOperator, lhs: &str, rhs: &str) -> Expr {
+        new_binary_expr(
+            op,
+            new_literal_expr(Literal::String(lhs.to_string())),
+            new_literal_expr(Literal::String(rhs.to_string())),
+        )
+    }
+
+    fn new_unary_expr(op: UnaryOperator, expr: Expr) -> Expr {
+        Expr::Unary {
+            op,
+            expr: Box::new(expr),
+            loc: default_loc_span(),
+        }
+    }
+
+    fn new_grouping_expr(expr: Expr) -> Expr {
+        Expr::Grouping {
+            expr: Box::new(expr),
+            loc: default_loc_span(),
+        }
+    }
+
+    fn run_test_eval(test_data: Vec<(Expr, ExprValue)>) {
+        for (expr, expected_value) in test_data {
+            let value = eval_expr(&expr, PathBuf::from("in-memory")).unwrap();
+            assert_eq!(value, expected_value);
+        }
+    }
+
+    fn run_test_eval_with_expected_errors(test_data: Vec<(Expr, &str)>) {
+        for (expr, expected_error) in test_data {
+            let value = eval_expr(&expr, PathBuf::from("in-memory"));
+            assert!(value.is_err_and(|err| err.to_string().contains(expected_error)));
+        }
     }
 
     #[test]
     fn test_eval_from_literal_ast() {
         let test_data = vec![
-            (Literal::Number(10.0), ExprValue::Number(10.0)),
             (
-                Literal::String(String::from("abc")),
-                ExprValue::String(String::from("abc")),
+                new_literal_expr(Literal::Number(10.0)),
+                ExprValue::Number(10.0),
             ),
-            (Literal::Boolean(true), ExprValue::Boolean(true)),
-            (Literal::Boolean(false), ExprValue::Boolean(false)),
-            (Literal::Nil, ExprValue::Nil),
+            (
+                new_literal_expr(Literal::String("abc".into())),
+                ExprValue::String("abc".into()),
+            ),
+            (
+                new_literal_expr(Literal::Boolean(true)),
+                ExprValue::Boolean(true),
+            ),
+            (
+                new_literal_expr(Literal::Boolean(false)),
+                ExprValue::Boolean(false),
+            ),
+            (new_literal_expr(Literal::Nil), ExprValue::Nil),
         ];
-
-        for (literal, expected_value) in test_data {
-            let ast = new_literal_expr(literal);
-            let value = run_eval(&ast).unwrap();
-            assert_eq!(value, expected_value);
-        }
-    }
-
-    fn new_binary_expr_number(op: BinaryOperator, lhs: f64, rhs: f64) -> Expr {
-        Expr::Binary {
-            lhs: Box::new(new_literal_expr(Literal::Number(lhs))),
-            op,
-            rhs: Box::new(new_literal_expr(Literal::Number(rhs))),
-            loc: default_loc_span(),
-        }
-    }
-
-    fn new_binary_expr_str(op: BinaryOperator, lhs: &str, rhs: &str) -> Expr {
-        Expr::Binary {
-            lhs: Box::new(new_literal_expr(Literal::String(lhs.to_string()))),
-            op,
-            rhs: Box::new(new_literal_expr(Literal::String(rhs.to_string()))),
-            loc: default_loc_span(),
-        }
+        run_test_eval(test_data);
     }
 
     #[test]
@@ -388,60 +423,95 @@ mod tests {
             ),
         ];
 
-        for (ast, expected_value) in test_data {
-            let value = run_eval(&ast).unwrap();
-            assert_eq!(value, expected_value);
-        }
-    }
-
-    fn new_unary_expr_from_literal(op: UnaryOperator, literal: Literal) -> Expr {
-        Expr::Unary {
-            op,
-            expr: Box::new(Expr::Literal {
-                literal,
-                loc: default_loc_span(),
-            }),
-            loc: default_loc_span(),
-        }
+        run_test_eval(test_data);
     }
 
     #[test]
     fn test_eval_unary_operator() {
         let test_data = vec![
             (
-                new_unary_expr_from_literal(UnaryOperator::Minus, Literal::Number(1.0)),
+                new_unary_expr(UnaryOperator::Minus, new_literal_expr(Literal::Number(1.0))),
                 ExprValue::Number(-1.0),
             ),
             (
-                new_unary_expr_from_literal(UnaryOperator::Minus, Literal::Number(-1.0)),
+                new_unary_expr(
+                    UnaryOperator::Minus,
+                    new_literal_expr(Literal::Number(-1.0)),
+                ),
                 ExprValue::Number(1.0),
             ),
             (
-                new_unary_expr_from_literal(UnaryOperator::Not, Literal::Boolean(true)),
+                new_unary_expr(UnaryOperator::Not, new_literal_expr(Literal::Boolean(true))),
                 ExprValue::Boolean(false),
             ),
             (
-                new_unary_expr_from_literal(UnaryOperator::Not, Literal::Boolean(false)),
+                new_unary_expr(
+                    UnaryOperator::Not,
+                    new_literal_expr(Literal::Boolean(false)),
+                ),
                 ExprValue::Boolean(true),
             ),
         ];
 
-        for (ast, expected_value) in test_data {
-            let value = run_eval(&ast).unwrap();
-            assert_eq!(value, expected_value);
-        }
+        run_test_eval(test_data);
     }
 
     #[test]
-    fn test_grouping_expr() {
-        let ast = Expr::Grouping {
-            expr: Box::new(Expr::Literal {
-                literal: Literal::Number(10.0),
-                loc: default_loc_span(),
-            }),
-            loc: default_loc_span(),
-        };
-        let value = run_eval(&ast).unwrap();
-        assert_eq!(value, ExprValue::Number(10.0));
+    fn test_eval_grouping_expr() {
+        let test_data = vec![(
+            new_grouping_expr(new_literal_expr(Literal::Number(10.0))),
+            ExprValue::Number(10.0),
+        )];
+
+        run_test_eval(test_data);
+    }
+
+    #[test]
+    fn test_eval_complex_ast() {
+        let test_data = vec![
+            (
+                new_binary_expr(
+                    BinaryOperator::Add,
+                    new_binary_expr_number(BinaryOperator::Multiply, 10.0, 2.0),
+                    new_binary_expr_number(BinaryOperator::Divide, 20.0, 4.0),
+                ),
+                ExprValue::Number(25.0),
+            ),
+            (
+                new_grouping_expr(new_unary_expr(
+                    UnaryOperator::Minus,
+                    new_grouping_expr(new_binary_expr_number(BinaryOperator::Add, 1.0, 0.5)),
+                )),
+                ExprValue::Number(-1.5),
+            ),
+            (
+                new_binary_expr(
+                    BinaryOperator::GreaterThanOrEqual,
+                    new_grouping_expr(new_binary_expr_number(
+                        BinaryOperator::Substract,
+                        42.0,
+                        20.0,
+                    )),
+                    new_grouping_expr(new_binary_expr_number(BinaryOperator::Multiply, 4.0, 6.0)),
+                ),
+                ExprValue::Boolean(false),
+            ),
+        ];
+
+        run_test_eval(test_data);
+    }
+
+    #[test]
+    fn test_eval_with_errors() {
+        let test_data = vec![(
+            new_binary_expr(
+                BinaryOperator::Add,
+                new_literal_expr(Literal::Number(10.0)),
+                new_literal_expr(Literal::String("abc".into())),
+            ),
+            "Binary operator '+' only supported for",
+        )];
+
+        run_test_eval_with_expected_errors(test_data);
     }
 }
