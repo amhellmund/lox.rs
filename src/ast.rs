@@ -90,3 +90,8 @@ impl Expr {
         }
     }
 }
+
+pub enum Stat {
+    Expr(Expr),
+    Print(Expr),
+}

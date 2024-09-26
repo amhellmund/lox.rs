@@ -44,6 +44,33 @@ impl<'a> TokenSequence<'a> {
         TokenSequence { tokens, pos: 0 }
     }
 
+    /// Consumes the current token if it has one of the given types types.
+    ///
+    /// In case the current token has one of the given token types, the current
+    /// token is returned and the position in the token stream is advanced to
+    /// the next token.
+    ///
+    /// In case the current token does not have the specified token, None is returned.
+    fn consume_if_has_token_type(&mut self, token_types: &[TokenType]) -> Option<Token> {
+        let current_token = self.current();
+        if self.current_has_token_type(token_types) {
+            self.advance();
+            return current_token;
+        } else {
+            return None;
+        }
+    }
+
+    fn consume_if_has_not_reached_end(&mut self) -> Option<Token> {
+        let current_token = self.current();
+        if !self.has_reached_end() {
+            self.advance();
+            return current_token;
+        } else {
+            return None;
+        }
+    }
+
     fn current(&self) -> Option<Token> {
         if self.pos < self.tokens.len() {
             return Some(self.tokens[self.pos].clone());
@@ -61,6 +88,10 @@ impl<'a> TokenSequence<'a> {
 
     fn advance(&mut self) {
         self.pos += 1;
+    }
+
+    fn has_reached_end(&self) -> bool {
+        self.pos >= self.tokens.len()
     }
 }
 
@@ -88,6 +119,36 @@ impl<'a> Parser<'a> {
         Ok(self.parse_expression()?)
     }
 
+    // fn parse_program(&mut self) -> Result<Vec<Stmt>> {
+    //     let mut statements: Vec<Stmt> = Vec::new();
+    //     while !self.tokens.has_reached_end() {
+    //         statements.push(self.parse_declaration()?);
+    //     }
+    //     Ok(statements)
+    // }
+
+    // fn parse_declaration(&mut self) -> Result<Stmt> {
+    //     if self.tokens.current_has_token_type(&[TokenType::Var]) {
+    //         self.tokens.advance();
+    //         self.parse_variable_declaration()
+    //     } else {
+    //         self.parse_statement()
+    //     }
+    // }
+
+    // fn parse_variable_declaration(&mut self) -> Result<Stmt> {
+    //     if self.tokens.current_has_token_type(&[TokenType::Identifier]) {
+    //         self.tokens.consume();
+    //     } else {
+    //     }
+    // }
+
+    // fn parse_statement(&mut self) -> Result<Stmt> {}
+
+    fn parse_expression(&mut self) -> Result<Expr> {
+        Ok(self.parse_equality()?)
+    }
+
     fn parse_binary_expr(
         &mut self,
         token_types: &[TokenType],
@@ -95,11 +156,9 @@ impl<'a> Parser<'a> {
     ) -> Result<Expr> {
         let mut expr = parse_fn(self)?;
 
-        while self.tokens.current_has_token_type(&token_types) {
-            let token = self.tokens.current().unwrap();
+        while let Some(token) = self.tokens.consume_if_has_token_type(&token_types) {
             let op = get_binary_operator_from_token_type(&token.token_type);
 
-            self.tokens.advance();
             let rhs = parse_fn(self)?;
 
             // the locations must get merged before the rhs expression gets moved into the new binary expression
@@ -112,10 +171,6 @@ impl<'a> Parser<'a> {
             }
         }
         Ok(expr)
-    }
-
-    fn parse_expression(&mut self) -> Result<Expr> {
-        Ok(self.parse_equality()?)
     }
 
     fn parse_equality(&mut self) -> Result<Expr> {
@@ -147,11 +202,9 @@ impl<'a> Parser<'a> {
 
     fn parse_unary(&mut self) -> Result<Expr> {
         let token_types = [TokenType::Minus, TokenType::Bang];
-        if self.tokens.current_has_token_type(&token_types) {
-            let token = self.tokens.current().unwrap();
+        if let Some(token) = self.tokens.consume_if_has_token_type(&token_types) {
             let op = get_unary_operator_from_token_type(&token.token_type);
 
-            self.tokens.advance();
             let expr = self.parse_primary()?;
             // The location must get preserved before the expression gets moved into the new unary expression
             let loc = LocationSpan::new(token.location, expr.get_loc().end_inclusive);
@@ -179,8 +232,7 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_primary(&mut self) -> Result<Expr> {
-        if let Some(token) = self.tokens.current() {
-            self.tokens.advance();
+        if let Some(token) = self.tokens.consume_if_has_not_reached_end() {
             let expr: Result<Expr> = match token.token_type {
                 TokenType::True => {
                     Self::create_expr_from_literal_and_token(Literal::Boolean(true), &token)
@@ -199,40 +251,46 @@ impl<'a> Parser<'a> {
                 ),
                 TokenType::LeftParanthesis => {
                     let expr = self.parse_expression()?;
-                    match self.tokens.current() {
-                        Some(closing_token) => {
-                            if closing_token.token_type == TokenType::RightParanthesis {
-                                self.tokens.advance();
-                                return Ok(Expr::Grouping {
-                                    expr: Box::new(expr),
-                                    loc: LocationSpan::new(token.location, closing_token.location),
-                                });
-                            } else {
+                    if let Some(closing_token) = self
+                        .tokens
+                        .consume_if_has_token_type(&[TokenType::RightParanthesis])
+                    {
+                        return Ok(Expr::Grouping {
+                            expr: Box::new(expr),
+                            loc: LocationSpan::new(token.location, closing_token.location),
+                        });
+                    } else {
+                        match self.tokens.current() {
+                            Some(token) => {
                                 return Err(DiagnosticError::new(
                                     format!(
                                         "Expected closing paranthesis, but got: '{}'",
-                                        &closing_token.lexeme
+                                        &token.lexeme
                                     ),
-                                    FileLocation::SinglePoint(closing_token.location),
+                                    FileLocation::SinglePoint(token.location),
+                                    self.source_file.clone(),
+                                )
+                                .into());
+                            }
+                            None => {
+                                return Err(DiagnosticError::new(
+                                    format!("Unexpected token: '{}'", token.lexeme),
+                                    FileLocation::SinglePoint(token.location),
                                     self.source_file.clone(),
                                 )
                                 .into());
                             }
                         }
-                        None => Err(DiagnosticError::new(
-                            format!("Expected closing paranthesis, but got end-of-file"),
-                            FileLocation::SinglePoint(token.location),
-                            self.source_file.clone(),
-                        )
-                        .into()),
                     }
                 }
-                _ => Err(DiagnosticError::new(
-                    format!("Unexpected token: '{}'", token.lexeme),
-                    FileLocation::SinglePoint(token.location),
-                    self.source_file.clone(),
-                )
-                .into()),
+                _ => {
+                    return Err(DiagnosticError::new(
+                        format!("Unexpected token: '{}'", token.lexeme),
+                        FileLocation::SinglePoint(token.location),
+                        self.source_file.clone(),
+                    )
+                    .into());
+                }
             };
             expr
         } else {
@@ -257,6 +315,8 @@ mod tests {
     };
 
     use crate::ast::{Expr, Literal};
+
+    // token sequence: ToDo
 
     fn parse_and_check_literal(
         tokens: &[Token],

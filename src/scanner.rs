@@ -93,6 +93,7 @@ pub enum TokenType {
     True,
     Var,
     While,
+    EndOfFile,
 }
 
 /// Token as an atomic element of the programming language
@@ -178,7 +179,17 @@ impl Tokenizer {
                 }
             }
         }
+        // add the EOF (End-of-File) marker for the parser to properly finalize the parse tree
+        self.add_eof_marker();
         Ok(self.tokens)
+    }
+
+    fn add_eof_marker(&mut self) {
+        self.tokens.push(Token::new(
+            TokenType::EndOfFile,
+            self.content.location,
+            String::from("<EOF>"),
+        ))
     }
 
     fn add_token(&mut self, token_type: TokenType, location: Location, lexeme: String) {
@@ -363,8 +374,10 @@ mod tests {
 
     fn assert_tokens(input: &str, expected_tokens: Vec<Token>) {
         let tokens = tokenize(input, PathBuf::from_str("in-memory").unwrap()).unwrap();
-        assert_eq!(tokens.len(), expected_tokens.len());
-        for (index, token) in tokens.iter().enumerate() {
+        // the last token by definition is end-of-file (which is not included in the explicitly expected tokens)
+        assert_eq!(tokens.len(), expected_tokens.len() + 1);
+        assert_eq!(tokens[tokens.len() - 1].token_type, TokenType::EndOfFile);
+        for (index, token) in tokens.iter().take(expected_tokens.len()).enumerate() {
             assert_eq!(token, &expected_tokens[index]);
         }
     }
