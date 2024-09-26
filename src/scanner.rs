@@ -1,59 +1,13 @@
+mod char_sequence;
+
 use std::path::PathBuf;
 
 use anyhow::Result;
 
 use crate::diagnostics::{DiagnosticError, FileLocation, Location};
+use crate::scanner::char_sequence::CharSequence;
 
-/// Wrapper around a sequence of characters providing convenience functions:
-///
-///   o Look at characters from the current position in the sequence
-///   o Advance position while updating the location information
-///   o End-of-sequence check
-struct CharSequence {
-    chars: Vec<char>,
-    pos: usize,
-    location: Location,
-}
-
-impl CharSequence {
-    fn new(chars: &str) -> Self {
-        Self {
-            chars: chars.chars().collect(),
-            pos: 0,
-            location: Location::new(1, 1),
-        }
-    }
-
-    fn look_at(&self, num: usize) -> Option<char> {
-        let index = self.pos + num;
-        if index < self.chars.len() {
-            Some(self.chars[index])
-        } else {
-            None
-        }
-    }
-
-    fn advance(&mut self, num: usize) {
-        for _ in 0..num {
-            if self.pos < self.chars.len() {
-                let ch = self.chars[self.pos];
-                if ch == '\n' {
-                    self.location.line += 1;
-                    self.location.column = 1;
-                } else if ch != '\r' {
-                    self.location.column += 1;
-                }
-                self.pos += 1;
-            }
-        }
-    }
-
-    fn has_reached_end(&self) -> bool {
-        return self.pos >= self.chars.len();
-    }
-}
-
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Copy)]
 pub enum TokenType {
     LeftParanthesis,
     RightParanthesis,
@@ -170,7 +124,7 @@ impl Tokenizer {
                         } else {
                             return Err(DiagnosticError::new(
                                 format!("Invalid character detected: '{}'", def_char),
-                                FileLocation::SinglePoint(self.content.location),
+                                FileLocation::SinglePoint(self.content.location()),
                                 self.source_file,
                             )
                             .into());
@@ -187,7 +141,7 @@ impl Tokenizer {
     fn add_eof_marker(&mut self) {
         self.tokens.push(Token::new(
             TokenType::EndOfFile,
-            self.content.location,
+            self.content.location(),
             String::from("<EOF>"),
         ))
     }
@@ -197,7 +151,7 @@ impl Tokenizer {
     }
 
     fn process_single_char_token(&mut self, ch: char, token_type: TokenType) {
-        self.add_token(token_type, self.content.location, String::from(ch));
+        self.add_token(token_type, self.content.location(), String::from(ch));
         self.content.advance(1);
     }
 
@@ -217,7 +171,7 @@ impl Tokenizer {
             token_length = 2;
         }
 
-        self.add_token(token_type, self.content.location, lexeme);
+        self.add_token(token_type, self.content.location(), lexeme);
         self.content.advance(token_length);
     }
 
@@ -232,7 +186,7 @@ impl Tokenizer {
             }
             self.content.advance(pos + 1);
         } else {
-            self.add_token(TokenType::Slash, self.content.location, String::from('/'));
+            self.add_token(TokenType::Slash, self.content.location(), String::from('/'));
             self.content.advance(1);
         }
     }
@@ -247,7 +201,7 @@ impl Tokenizer {
             lexeme.push(ch);
             pos += 1;
         }
-        self.add_token(TokenType::Number, self.content.location, lexeme);
+        self.add_token(TokenType::Number, self.content.location(), lexeme);
         self.content.advance(pos);
     }
 
@@ -280,7 +234,7 @@ impl Tokenizer {
             "while" => TokenType::While,
             _ => TokenType::Identifier,
         };
-        self.add_token(token_type, self.content.location, lexeme);
+        self.add_token(token_type, self.content.location(), lexeme);
         self.content.advance(pos);
     }
 
@@ -293,7 +247,7 @@ impl Tokenizer {
             } else if ch == '\n' {
                 return Err(DiagnosticError::new(
                     format!("Unfinished string literal: '{}'", lexeme),
-                    FileLocation::SinglePoint(self.content.location),
+                    FileLocation::SinglePoint(self.content.location()),
                     self.source_file.clone(),
                 )
                 .into());
@@ -303,7 +257,7 @@ impl Tokenizer {
         }
         self.tokens.push(Token {
             token_type: TokenType::StringLiteral,
-            location: self.content.location,
+            location: self.content.location(),
             lexeme,
         });
         self.content.advance(pos + 1);
@@ -321,55 +275,11 @@ pub fn tokenize(input: &str, source_file: PathBuf) -> Result<Vec<Token>> {
 mod tests {
     use std::{path::PathBuf, str::FromStr};
 
-    use super::{tokenize, CharSequence, Location, Token, TokenType};
+    use super::{tokenize, Location, Token, TokenType};
     use textwrap::dedent;
-
-    fn construct_char_sequence(input: &str) -> CharSequence {
-        CharSequence::new(input)
-    }
 
     fn new_loc(line: i64, column: i64) -> Location {
         Location { line, column }
-    }
-
-    #[test]
-    fn test_char_sequence_empty_sequence() {
-        let seq = construct_char_sequence("");
-        assert_eq!(seq.look_at(0), None);
-        assert_eq!(seq.has_reached_end(), true);
-    }
-
-    #[test]
-    fn test_char_sequence_single_char() {
-        let mut seq = construct_char_sequence("a");
-        assert_eq!(seq.look_at(0), Some('a'));
-        assert_eq!(seq.look_at(0), Some('a'));
-        seq.advance(1);
-        assert_eq!(seq.location, new_loc(1, 2));
-        assert_eq!(seq.look_at(0), None);
-        assert_eq!(seq.has_reached_end(), true);
-    }
-
-    #[test]
-    fn test_char_sequence_multiple_chars() {
-        let mut seq = construct_char_sequence("ab");
-        assert_eq!(seq.look_at(0), Some('a'));
-        assert_eq!(seq.look_at(1), Some('b'));
-        seq.advance(2);
-        assert_eq!(seq.location, new_loc(1, 3));
-        assert_eq!(seq.has_reached_end(), true);
-    }
-
-    #[test]
-    fn test_char_sequence_with_newline() {
-        let mut seq = construct_char_sequence("abcdef\nhij");
-        assert_eq!(seq.look_at(0), Some('a'));
-        seq.advance(5);
-        assert_eq!(seq.location, new_loc(1, 6));
-        assert_eq!(seq.look_at(0), Some('f'));
-        seq.advance(2);
-        assert_eq!(seq.location, new_loc(2, 1));
-        assert_eq!(seq.look_at(0), Some('h'));
     }
 
     fn assert_tokens(input: &str, expected_tokens: Vec<Token>) {

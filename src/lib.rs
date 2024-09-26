@@ -25,16 +25,16 @@ pub fn execute(file_path: &Path, show_ast: bool) -> Result<()> {
         .with_context(|| format!("Failed to read file {}", file_path.display()))?;
 
     let tokens = scanner::tokenize(&content, file_path.to_path_buf())?;
-    let ast = parser::parse(&tokens, file_path.to_path_buf())
-        .with_context(|| "Failed to parse the input file")?;
-    let expr_value = eval_expr(&ast, file_path.to_path_buf())?;
+    // let ast = parser::parse(&tokens, file_path.to_path_buf())
+    //     .with_context(|| "Failed to parse the input file")?;
+    // let expr_value = eval_expr(&ast, file_path.to_path_buf())?;
 
-    if show_ast {
-        let ast_as_string = print_ast(&ast);
-        println!("AST:\n{}", ast_as_string);
-    }
+    // if show_ast {
+    //     let ast_as_string = print_ast(&ast);
+    //     println!("AST:\n{}", ast_as_string);
+    // }
 
-    println!("Expr: {}", expr_value.to_string());
+    // println!("Expr: {}", expr_value.to_string());
     Ok(())
 }
 
@@ -42,36 +42,36 @@ pub fn execute(file_path: &Path, show_ast: bool) -> Result<()> {
 ///
 /// Currently, only expressions are supported by the implementation.
 pub fn repl() -> Result<()> {
-    loop {
-        print!("lox> ");
-        io::stdout().flush()?;
+    // loop {
+    //     print!("lox> ");
+    //     io::stdout().flush()?;
 
-        let mut content = String::new();
-        io::stdin().read_line(&mut content)?;
-        if is_exit_command(&content) {
-            break;
-        }
+    //     let mut content = String::new();
+    //     io::stdin().read_line(&mut content)?;
+    //     if is_exit_command(&content) {
+    //         break;
+    //     }
 
-        if let Err(err) = repl_impl(content) {
-            println!("Error: {}", err)
-        }
-    }
+    //     if let Err(err) = repl_impl(content) {
+    //         println!("Error: {}", err)
+    //     }
+    // }
     Ok(())
 }
 
-fn repl_impl(content: String) -> Result<()> {
-    let file_path = PathBuf::from("repl");
-    let tokens = scanner::tokenize(&content, file_path.to_path_buf())?;
-    let ast_expr = parser::parse(&tokens, file_path.to_path_buf())?;
-    let expr_value = eval_expr(&ast_expr, file_path.to_path_buf())?;
-    println!("Result: {}", expr_value.to_string());
-    Ok(())
-}
+// fn repl_impl(content: String) -> Result<()> {
+//     let file_path = PathBuf::from("repl");
+//     let tokens = scanner::tokenize(&content, file_path.to_path_buf())?;
+//     let ast_expr = parser::parse(&tokens, file_path.to_path_buf())?;
+//     let expr_value = eval_expr(&ast_expr, file_path.to_path_buf())?;
+//     println!("Result: {}", expr_value.to_string());
+//     Ok(())
+// }
 
-fn is_exit_command(content: &str) -> bool {
-    content.starts_with("exit")
-        && content[4..]
-            .chars()
-            .into_iter()
-            .all(|ch| ch.is_whitespace())
-}
+// fn is_exit_command(content: &str) -> bool {
+//     content.starts_with("exit")
+//         && content[4..]
+//             .chars()
+//             .into_iter()
+//             .all(|ch| ch.is_whitespace())
+// }
