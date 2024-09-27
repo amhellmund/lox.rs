@@ -100,4 +100,41 @@ mod tests {
         seq.advance();
         assert_eq!(seq.current().token_type, TokenType::EndOfFile);
     }
+
+    #[test]
+    fn test_consume_if_has_token_type() {
+        let mut seq = create_token_sequence(&[TokenType::And, TokenType::EndOfFile]);
+        let result = seq.consume_if_has_token_type(&[TokenType::And]);
+        assert!(result.is_some());
+        let token = result.unwrap();
+        assert_eq!(token.token_type, TokenType::And);
+    }
+
+    #[test]
+    fn test_consume_if_has_token_type_not_contained() {
+        let mut seq = create_token_sequence(&[TokenType::And, TokenType::EndOfFile]);
+        let result = seq.consume_if_has_token_type(&[TokenType::Bang]);
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_consume() {
+        let mut seq = create_token_sequence(&[TokenType::And, TokenType::EndOfFile]);
+        assert_eq!(seq.consume().token_type, TokenType::And);
+        assert_eq!(seq.consume().token_type, TokenType::EndOfFile);
+        assert_eq!(seq.consume().token_type, TokenType::EndOfFile);
+    }
+
+    #[test]
+    fn test_token_values_preserved() {
+        let tokens = vec![
+            Token::new(TokenType::And, Location::new(1, 1), String::from("and")),
+            Token::new(TokenType::Bang, Location::new(2, 1), String::from("!")),
+            Token::new(TokenType::EndOfFile, Location::new(2, 2), String::default()),
+        ];
+        let mut seq = TokenSequence::new(tokens.clone());
+        assert_eq!(seq.consume(), tokens[0]);
+        assert_eq!(seq.consume(), tokens[1]);
+        assert_eq!(seq.consume(), tokens[2]);
+    }
 }
