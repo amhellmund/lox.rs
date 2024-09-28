@@ -20,6 +20,9 @@ impl CharSequence {
         }
     }
 
+    /// Returns the character at the current position in the character sequence.
+    ///
+    /// In case the end-of-sequence has been reached, None is returned.
     pub fn look_at(&self, num: usize) -> Option<char> {
         let index = self.pos + num;
         if index < self.chars.len() {
@@ -29,6 +32,7 @@ impl CharSequence {
         }
     }
 
+    /// Advances the position in character sequence by the given parameter `num`.
     pub fn advance(&mut self, num: usize) {
         for _ in 0..num {
             if self.pos < self.chars.len() {
@@ -44,10 +48,12 @@ impl CharSequence {
         }
     }
 
+    /// Returns if the end of the sequence (past the last character) has been reached.
     pub fn has_reached_end(&self) -> bool {
         return self.pos >= self.chars.len();
     }
 
+    /// Returns the location in the character sequence taking newlines into account.
     pub fn location(&self) -> Location {
         self.location
     }

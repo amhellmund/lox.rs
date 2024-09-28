@@ -9,6 +9,7 @@ use anyhow::Result;
 
 use token_sequence::TokenSequence;
 
+/// Interface function to convert a sequence of tokens into an Abstract Syntax Tree (AST).
 pub fn parse(tokens: Vec<Token>, source_file: PathBuf) -> Result<Expr> {
     let mut parser = Parser::new(tokens, source_file);
     Ok(parser.parse()?)
@@ -38,6 +39,7 @@ fn get_unary_operator_from_token_type(token_type: &TokenType) -> UnaryOperator {
     }
 }
 
+/// Parser class to construct an AST.
 struct Parser {
     tokens: TokenSequence,
     source_file: PathBuf,
@@ -175,75 +177,56 @@ impl Parser {
     }
 
     fn parse_primary(&mut self) -> Result<Expr> {
-        if let Some(token) = self.tokens.consume_if_has_not_reached_end() {
-            let expr: Result<Expr> = match token.token_type {
-                TokenType::True => {
-                    Self::create_expr_from_literal_and_token(Literal::Boolean(true), &token)
-                }
-                TokenType::False => {
-                    Self::create_expr_from_literal_and_token(Literal::Boolean(false), &token)
-                }
-                TokenType::Nil => Self::create_expr_from_literal_and_token(Literal::Nil, &token),
-                TokenType::StringLiteral => Self::create_expr_from_literal_and_token(
-                    Literal::String(String::from(&token.lexeme)),
-                    &token,
-                ),
-                TokenType::Number => Self::create_expr_from_literal_and_token(
-                    Literal::Number(token.lexeme.parse()?),
-                    &token,
-                ),
-                TokenType::LeftParanthesis => {
-                    let expr = self.parse_expression()?;
-                    if let Some(closing_token) = self
-                        .tokens
-                        .consume_if_has_token_type(&[TokenType::RightParanthesis])
-                    {
-                        return Ok(Expr::Grouping {
-                            expr: Box::new(expr),
-                            loc: LocationSpan::new(token.location, closing_token.location),
-                        });
-                    } else {
-                        match self.tokens.current() {
-                            Some(token) => {
-                                return Err(DiagnosticError::new(
-                                    format!(
-                                        "Expected closing paranthesis, but got: '{}'",
-                                        &token.lexeme
-                                    ),
-                                    FileLocation::SinglePoint(token.location),
-                                    self.source_file.clone(),
-                                )
-                                .into());
-                            }
-                            None => {
-                                return Err(DiagnosticError::new(
-                                    format!("Unexpected token: '{}'", token.lexeme),
-                                    FileLocation::SinglePoint(token.location),
-                                    self.source_file.clone(),
-                                )
-                                .into());
-                            }
-                        }
-                    }
-                }
-                _ => {
+        let token = self.tokens.consume();
+        let expr: Result<Expr> = match token.token_type {
+            TokenType::True => {
+                Self::create_expr_from_literal_and_token(Literal::Boolean(true), &token)
+            }
+            TokenType::False => {
+                Self::create_expr_from_literal_and_token(Literal::Boolean(false), &token)
+            }
+            TokenType::Nil => Self::create_expr_from_literal_and_token(Literal::Nil, &token),
+            TokenType::StringLiteral => Self::create_expr_from_literal_and_token(
+                Literal::String(String::from(&token.lexeme)),
+                &token,
+            ),
+            TokenType::Number => Self::create_expr_from_literal_and_token(
+                Literal::Number(token.lexeme.parse()?),
+                &token,
+            ),
+            TokenType::LeftParanthesis => {
+                let expr = self.parse_expression()?;
+                if let Some(closing_token) = self
+                    .tokens
+                    .consume_if_has_token_type(&[TokenType::RightParanthesis])
+                {
+                    return Ok(Expr::Grouping {
+                        expr: Box::new(expr),
+                        loc: LocationSpan::new(token.location, closing_token.location),
+                    });
+                } else {
+                    let cur_token = self.tokens.current();
                     return Err(DiagnosticError::new(
-                        format!("Unexpected token: '{}'", token.lexeme),
+                        format!(
+                            "Expected closing paranthesis, but got: '{}'",
+                            &cur_token.lexeme
+                        ),
                         FileLocation::SinglePoint(token.location),
                         self.source_file.clone(),
                     )
                     .into());
                 }
-            };
-            expr
-        } else {
-            return Err(DiagnosticError::new(
-                format!("Expected a primary expression, but got end-of-file"),
-                FileLocation::EndOfFile,
-                self.source_file.clone(),
-            )
-            .into());
-        }
+            }
+            _ => {
+                return Err(DiagnosticError::new(
+                    format!("Unexpected token: '{}'", token.lexeme),
+                    FileLocation::SinglePoint(token.location),
+                    self.source_file.clone(),
+                )
+                .into());
+            }
+        };
+        expr
     }
 }
 
@@ -259,14 +242,23 @@ mod tests {
 
     use crate::ast::{Expr, Literal};
 
-    // token sequence: ToDo
+    fn add_eof_to_tokens(tokens: Vec<Token>) -> Vec<Token> {
+        let mut in_tokens = tokens;
+        let mut loc = Location::new(1, 1);
+        if let Some(last_token) = in_tokens.last() {
+            loc.line = last_token.location.line;
+            loc.column = last_token.location.column + 1;
+        }
+        in_tokens.push(Token::new(TokenType::EndOfFile, loc, String::default()));
+        in_tokens
+    }
 
     fn parse_and_check_literal(
-        tokens: &[Token],
+        tokens: Vec<Token>,
         expected_literal: Literal,
         expected_end_inclusive_loc: Location,
     ) {
-        let ast = parse(&tokens, "in-memory".into());
+        let ast = parse(tokens, "in-memory".into());
         assert!(ast.is_ok());
 
         if let Expr::Literal { literal, loc } = ast.unwrap() {
@@ -282,23 +274,23 @@ mod tests {
 
     #[test]
     fn test_primary_expr_from_number() {
-        let tokens = vec![Token::new(
+        let tokens = add_eof_to_tokens(vec![Token::new(
             TokenType::Number,
             Location::new(1, 1),
             String::from("12.0"),
-        )];
-        parse_and_check_literal(&tokens, Literal::Number(12.0), Location::new(1, 4));
+        )]);
+        parse_and_check_literal(tokens, Literal::Number(12.0), Location::new(1, 4));
     }
 
     #[test]
     fn test_primary_expr_from_string() {
-        let tokens = vec![Token::new(
+        let tokens = add_eof_to_tokens(vec![Token::new(
             TokenType::StringLiteral,
             Location::new(1, 1),
             String::from("abc"),
-        )];
+        )]);
         parse_and_check_literal(
-            &tokens,
+            tokens,
             Literal::String(String::from("abc")),
             Location::new(1, 3),
         );
@@ -306,37 +298,37 @@ mod tests {
 
     #[test]
     fn test_primary_expr_from_boolean_true() {
-        let tokens = vec![Token::new(
+        let tokens = add_eof_to_tokens(vec![Token::new(
             TokenType::True,
             Location::new(1, 1),
             String::from("true"),
-        )];
-        parse_and_check_literal(&tokens, Literal::Boolean(true), Location::new(1, 4));
+        )]);
+        parse_and_check_literal(tokens, Literal::Boolean(true), Location::new(1, 4));
     }
 
     #[test]
     fn test_primary_expr_from_boolean_false() {
-        let tokens = vec![Token::new(
+        let tokens = add_eof_to_tokens(vec![Token::new(
             TokenType::False,
             Location::new(1, 1),
             String::from("false"),
-        )];
-        parse_and_check_literal(&tokens, Literal::Boolean(false), Location::new(1, 5));
+        )]);
+        parse_and_check_literal(tokens, Literal::Boolean(false), Location::new(1, 5));
     }
 
     #[test]
     fn test_primary_expr_from_boolean_nil() {
-        let tokens = vec![Token::new(
+        let tokens = add_eof_to_tokens(vec![Token::new(
             TokenType::Nil,
             Location::new(1, 1),
             String::from("nil"),
-        )];
-        parse_and_check_literal(&tokens, Literal::Nil, Location::new(1, 3));
+        )]);
+        parse_and_check_literal(tokens, Literal::Nil, Location::new(1, 3));
     }
 
     #[test]
     fn test_grouping_expr() {
-        let tokens = vec![
+        let tokens = add_eof_to_tokens(vec![
             Token::new(
                 TokenType::LeftParanthesis,
                 Location::new(1, 1),
@@ -348,7 +340,7 @@ mod tests {
                 Location::new(1, 3),
                 String::from(")"),
             ),
-        ];
+        ]);
         let expected_ast = Expr::Grouping {
             expr: Box::new(Expr::Literal {
                 literal: Literal::Number(0.0),
@@ -357,7 +349,7 @@ mod tests {
             loc: LocationSpan::new(Location::new(1, 1), Location::new(1, 3)),
         };
 
-        let ast = parse(&tokens, "in-memory".into()).unwrap();
+        let ast = parse(tokens, "in-memory".into()).unwrap();
         assert_eq!(ast, expected_ast);
     }
 
@@ -401,7 +393,7 @@ mod tests {
         ];
         for (token_type, lexeme, binary_op) in test_data {
             let lexeme_length = lexeme.len() as i64;
-            let tokens = vec![
+            let tokens = add_eof_to_tokens(vec![
                 Token::new(
                     TokenType::StringLiteral,
                     Location::new(1, 1),
@@ -413,7 +405,7 @@ mod tests {
                     Location::new(1, 2 + lexeme_length),
                     String::from("b"),
                 ),
-            ];
+            ]);
             let expected_ast = Expr::Binary {
                 lhs: Box::new(Expr::Literal {
                     literal: Literal::String(String::from("a")),
@@ -429,7 +421,7 @@ mod tests {
                 }),
                 loc: LocationSpan::new(Location::new(1, 1), Location::new(1, 2 + lexeme_length)),
             };
-            let ast = parse(&tokens, "in-memory".into()).unwrap();
+            let ast = parse(tokens, "in-memory".into()).unwrap();
             assert_eq!(ast, expected_ast);
         }
     }
@@ -441,10 +433,10 @@ mod tests {
             (TokenType::Bang, String::from("!"), UnaryOperator::Not),
         ];
         for (token_type, lexeme, unary_op) in test_data {
-            let tokens = vec![
+            let tokens = add_eof_to_tokens(vec![
                 Token::new(token_type, Location::new(1, 1), lexeme),
                 Token::new(TokenType::Number, Location::new(1, 2), String::from("1")),
-            ];
+            ]);
             let expected_ast = Expr::Unary {
                 op: unary_op,
                 expr: Box::new(Expr::Literal {
@@ -453,14 +445,14 @@ mod tests {
                 }),
                 loc: LocationSpan::new(Location::new(1, 1), Location::new(1, 2)),
             };
-            let ast: Expr = parse(&tokens, "in-memory".into()).unwrap();
+            let ast: Expr = parse(tokens, "in-memory".into()).unwrap();
             assert_eq!(ast, expected_ast);
         }
     }
 
     #[test]
     fn test_multiline_expr() {
-        let tokens = vec![
+        let tokens = add_eof_to_tokens(vec![
             Token::new(
                 TokenType::StringLiteral,
                 Location::new(1, 1),
@@ -472,7 +464,7 @@ mod tests {
                 Location::new(3, 4),
                 String::from("b"),
             ),
-        ];
+        ]);
         let expected_ast = Expr::Binary {
             lhs: Box::new(Expr::Literal {
                 literal: Literal::String(String::from("a")),
@@ -485,7 +477,7 @@ mod tests {
             }),
             loc: LocationSpan::new(Location::new(1, 1), Location::new(3, 4)),
         };
-        let ast = parse(&tokens, "in-memory".into()).unwrap();
+        let ast = parse(tokens, "in-memory".into()).unwrap();
         assert_eq!(ast, expected_ast);
     }
 }

@@ -50,7 +50,11 @@ pub enum TokenType {
     EndOfFile,
 }
 
-/// Token as an atomic element of the programming language
+/// The token is as the atomic element of the programming language.
+///
+/// The lexeme contains the matched string within the input program, e.g.
+/// the lexeme for the token type `Identifer` is the name of the variable
+/// in the program.
 #[derive(Debug, PartialEq, Clone)]
 pub struct Token {
     pub token_type: TokenType,
@@ -68,7 +72,14 @@ impl Token {
     }
 }
 
-/// Utility class to split input code sequence into tokens
+/// Interface function to convert the input program into a sequence of tokens.
+pub fn tokenize(input: &str, source_file: PathBuf) -> Result<Vec<Token>> {
+    let tokenizer = Tokenizer::new(input, source_file);
+    let tokens = tokenizer.tokenize()?;
+    Ok(tokens)
+}
+
+/// Scanner class to transform the input program into a sequence of indivdual tokens.
 struct Tokenizer {
     content: CharSequence,
     tokens: Vec<Token>,
@@ -76,7 +87,7 @@ struct Tokenizer {
 }
 
 impl Tokenizer {
-    pub fn new(content: &str, source_file: PathBuf) -> Self {
+    fn new(content: &str, source_file: PathBuf) -> Self {
         let tokenizer = Tokenizer {
             content: CharSequence::new(content),
             tokens: Vec::new(),
@@ -85,7 +96,10 @@ impl Tokenizer {
         tokenizer
     }
 
-    pub fn tokenize(mut self) -> Result<Vec<Token>> {
+    /// Performs the conversion to a sequence of tokens.
+    ///
+    /// In case of an error during scanning, a `DiagnosticError` is returned.
+    fn tokenize(mut self) -> Result<Vec<Token>> {
         while self.content.has_reached_end() == false {
             if let Some(ch) = self.content.look_at(0) {
                 match ch {
@@ -263,12 +277,6 @@ impl Tokenizer {
         self.content.advance(pos + 1);
         Ok(())
     }
-}
-
-pub fn tokenize(input: &str, source_file: PathBuf) -> Result<Vec<Token>> {
-    let tokenizer = Tokenizer::new(input, source_file);
-    let tokens = tokenizer.tokenize()?;
-    Ok(tokens)
 }
 
 #[cfg(test)]

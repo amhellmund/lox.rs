@@ -4,8 +4,13 @@ use crate::scanner::{Token, TokenType};
 ///
 /// Precondition: The token sequence must always end with an `EndOfFile` token.
 ///
-/// The token sequence will always return a valid token. In case the EndOfFile token
+/// The token sequence will always return a valid token. In case the `EndOfFile` token
 /// has been reached, it will continuously return this token.
+///
+/// The utility class provides the following convenience:
+///
+///   o consuming (advance+return) a token if the token at the current position has a given type.
+///   o consuming (advance+return) a token at the current position in the sequence.
 pub struct TokenSequence {
     tokens: Vec<Token>,
     pos: usize,
@@ -45,6 +50,16 @@ impl TokenSequence {
         }
     }
 
+    /// Consumes the current token, that is the current token gets returned. Beforehand the position
+    /// gets advanced to the next position in the input sequence.
+    ///
+    /// Example: Token Sequence
+    ///  | T01 | T02 | T03 | T04 | EOF |
+    ///           ^
+    /// Token `TO2` gets returned, and the position gets advanced to `T03` at the end of the function.
+    ///
+    /// Note: This function does always return a valid token. In case the `EndOfFile` token has been reached
+    /// in the input sequence, it continuously returns this token.
     pub fn consume(&mut self) -> Token {
         let current_token = self.current();
         if !self.has_reached_end() {
@@ -53,6 +68,7 @@ impl TokenSequence {
         current_token
     }
 
+    /// Returns if the end of the sequence has been reached.
     pub fn has_reached_end(&self) -> bool {
         self.pos == self.tokens.len() - 1
     }
