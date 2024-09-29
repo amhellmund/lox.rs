@@ -1,10 +1,8 @@
-{
-    var a = "before" / b;
-    print a;
+var a = "before" / b;
+print a;
 
-    a = "after";
-    print a; // expect: after
+// a = "after";
+print a; // expect: after
 
-    print a = "arg";
-    print a; // expect:
-}
+print a = "arg";
+print a; // expect:
