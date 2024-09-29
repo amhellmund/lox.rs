@@ -47,6 +47,8 @@ pub fn execute(file_path: &Path, show_ast: bool) -> Result<()> {
 pub fn repl() -> Result<()> {
     let mut output_writer = std::io::stdout();
     let mut evaluator = Evaluator::new("repl".into(), Some(&mut output_writer));
+
+    print_repl_info();
     loop {
         print!("lox> ");
         io::stdout().flush()?;
@@ -62,6 +64,13 @@ pub fn repl() -> Result<()> {
         }
     }
     Ok(())
+}
+
+fn print_repl_info() {
+    println!("#####################");
+    println!("### Lox REPL Mode ###");
+    println!("#####################\n");
+    println!("Exit the REPL mode by entering 'exit'. Have FUN!\n\n");
 }
 
 fn repl_impl<'a, W: Write>(content: String, evaluator: &mut Evaluator<'a, W>) -> Result<()> {
