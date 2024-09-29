@@ -114,6 +114,7 @@ impl Expr {
     }
 }
 
+#[derive(PartialEq, Debug)]
 pub enum Stmt {
     List(Vec<Stmt>),
     VarDecl {

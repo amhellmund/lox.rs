@@ -444,7 +444,7 @@ mod tests {
     };
     use anyhow::Result;
 
-    use crate::ast::{Expr, Literal};
+    use crate::ast::{Expr, Literal, Stmt};
 
     fn build_token_sequence(token_types: Vec<TokenType>) -> Vec<Token> {
         let mut loc = Location::new(1, 1);
@@ -482,6 +482,11 @@ mod tests {
     fn parse_expr(tokens: Vec<Token>) -> Result<Expr> {
         let mut parser = Parser::new(tokens, "in-memory".into());
         parser.parse_expression()
+    }
+
+    fn parse_stmt(tokens: Vec<Token>) -> Result<Stmt> {
+        let mut parser = Parser::new(tokens, "in-memory".into());
+        parser.parse_declaration()
     }
 
     fn parse_expr_and_check_literal(
@@ -654,5 +659,104 @@ mod tests {
             let ast: Expr = parse_expr(tokens).unwrap();
             assert_eq!(ast, expected_ast);
         }
+    }
+
+    #[test]
+    fn test_variable_declaration_statement_no_initializer() {
+        let tokens = build_token_sequence(vec![
+            TokenType::Var,
+            TokenType::Identifier,
+            TokenType::Semicolon,
+        ]);
+        let expected_ast = Stmt::VarDecl {
+            identifier: String::from("identifier"),
+            init_expr: Box::new(Expr::Literal {
+                literal: Literal::Nil,
+                loc: LocationSpan::new(Location::new(2, 1), Location::new(2, 10)),
+            }),
+            loc: LocationSpan::new(Location::new(1, 1), Location::new(3, 1)),
+        };
+        let ast = parse_stmt(tokens).unwrap();
+        assert_eq!(ast, expected_ast);
+    }
+
+    #[test]
+    fn test_variable_declaration_statement_with_initializer() {
+        let tokens = build_token_sequence(vec![
+            TokenType::Var,
+            TokenType::Identifier,
+            TokenType::Equal,
+            TokenType::Number,
+            TokenType::Semicolon,
+        ]);
+        let expected_ast = Stmt::VarDecl {
+            identifier: String::from("identifier"),
+            init_expr: Box::new(Expr::Literal {
+                literal: Literal::Number(0.0),
+                loc: LocationSpan::new(Location::new(4, 1), Location::new(4, 3)),
+            }),
+            loc: LocationSpan::new(Location::new(1, 1), Location::new(5, 1)),
+        };
+        let ast = parse_stmt(tokens).unwrap();
+        assert_eq!(ast, expected_ast);
+    }
+
+    #[test]
+    fn test_variable_declaration_errors() {
+        let test_data = vec![
+            build_token_sequence(vec![TokenType::Var, TokenType::Identifier]),
+            build_token_sequence(vec![
+                TokenType::Var,
+                TokenType::Identifier,
+                TokenType::Equal,
+                TokenType::Semicolon,
+            ]),
+        ];
+        for tokens in test_data {
+            assert!(parse_stmt(tokens).is_err());
+        }
+    }
+
+    #[test]
+    fn test_print_statement() {
+        let tokens = build_token_sequence(vec![
+            TokenType::Print,
+            TokenType::Number,
+            TokenType::Semicolon,
+        ]);
+        let expected_ast = Stmt::Print {
+            expr: Box::new(Expr::Literal {
+                literal: Literal::Number(0.0),
+                loc: LocationSpan::new(Location::new(2, 1), Location::new(2, 3)),
+            }),
+            loc: LocationSpan::new(Location::new(1, 1), Location::new(3, 1)),
+        };
+        let ast = parse_stmt(tokens).unwrap();
+        assert_eq!(ast, expected_ast);
+    }
+
+    #[test]
+    fn test_print_statement_errors() {
+        let test_data = vec![
+            build_token_sequence(vec![TokenType::Print, TokenType::Semicolon]),
+            build_token_sequence(vec![TokenType::Print, TokenType::Number]),
+        ];
+        for tokens in test_data {
+            assert!(parse_stmt(tokens).is_err());
+        }
+    }
+
+    #[test]
+    fn test_expr_statement() {
+        let tokens = build_token_sequence(vec![TokenType::Number, TokenType::Semicolon]);
+        let expected_ast = Stmt::Expr {
+            expr: Box::new(Expr::Literal {
+                literal: Literal::Number(0.0),
+                loc: LocationSpan::new(Location::new(1, 1), Location::new(1, 3)),
+            }),
+            loc: LocationSpan::new(Location::new(1, 1), Location::new(2, 1)),
+        };
+        let ast = parse_stmt(tokens).unwrap();
+        assert_eq!(ast, expected_ast);
     }
 }
