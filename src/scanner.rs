@@ -1,3 +1,13 @@
+// Copyright (c) 2024 Andi Hellmund. All rights reserved.
+//
+// This work is licensed under the terms of the BSD-3-Clause license.
+// For a copy, see <https://opensource.org/license/bsd-3-clause>.
+
+//! Scanner for the Lox programming language.
+//!
+//! A scanner scans over the input file (character sequence) and creates
+//! a sequence of tokens (atoms of the language).
+
 mod char_sequence;
 
 use std::path::PathBuf;
@@ -72,7 +82,7 @@ impl Token {
     }
 }
 
-/// Interface function to convert the input program into a sequence of tokens.
+/// Converts the input program into a sequence of tokens.
 pub fn tokenize(input: &str, source_file: PathBuf) -> Result<Vec<Token>> {
     let tokenizer = Tokenizer::new(input, source_file);
     let tokens = tokenizer.tokenize()?;

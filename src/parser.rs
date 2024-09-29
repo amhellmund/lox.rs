@@ -1,3 +1,17 @@
+// Copyright (c) 2024 Andi Hellmund. All rights reserved.
+//
+// This work is licensed under the terms of the BSD-3-Clause license.
+// For a copy, see <https://opensource.org/license/bsd-3-clause>.
+
+//! Recursive-descent Parser for the Lox programming language.
+//!
+//! The syntax and reference of the Lox programming langauge is documented here:
+//!
+//!   https://craftinginterpreters.com/the-lox-language.html
+//!
+//! The terms and notations will be re-used in the code and documentation of the
+//! individual functions to better map them.
+
 mod token_sequence;
 
 use std::path::PathBuf;
@@ -9,7 +23,7 @@ use anyhow::Result;
 
 use token_sequence::TokenSequence;
 
-/// Interface function to convert a sequence of tokens into an Abstract Syntax Tree (AST).
+/// Converts a sequence of tokens into an Abstract Syntax Tree (AST).
 pub fn parse(tokens: Vec<Token>, source_file: PathBuf) -> Result<Expr> {
     let mut parser = Parser::new(tokens, source_file);
     Ok(parser.parse()?)
@@ -39,7 +53,7 @@ fn get_unary_operator_from_token_type(token_type: &TokenType) -> UnaryOperator {
     }
 }
 
-/// Parser class to construct an AST.
+/// Implementation class to convert the sequence of tokens into the AST.
 struct Parser {
     tokens: TokenSequence,
     source_file: PathBuf,
@@ -90,10 +104,23 @@ impl Parser {
 
     // fn parse_statement(&mut self) -> Result<Stmt> {}
 
+    /// Parses an expression (lowest precedence -> highest in AST (sub)hierarchy).
+    ///
+    /// Grammar rule:
+    ///
+    ///   expression: equality
     fn parse_expression(&mut self) -> Result<Expr> {
         Ok(self.parse_equality()?)
     }
 
+    /// Parses generic binary expressions.
+    ///
+    /// The token types valid for the binary expressions as well as the parsing function
+    /// for the next entity (with higher precedence in the grammar) get passed into this function.
+    ///
+    /// Grammar rule:
+    ///
+    ///   <non-terminal>: [parse_fn -> Expr] ( <binary_op> [parse_fn -> Expr] )*
     fn parse_binary_expr(
         &mut self,
         token_types: &[TokenType],
@@ -106,7 +133,7 @@ impl Parser {
 
             let rhs = parse_fn(self)?;
 
-            // the locations must get merged before the rhs expression gets moved into the new binary expression
+            // The locations must get merged before the rhs expression gets moved into the new binary expression.
             let loc = Self::merge_token_locations(&expr, &rhs);
             expr = Expr::Binary {
                 lhs: Box::new(expr),
@@ -118,11 +145,21 @@ impl Parser {
         Ok(expr)
     }
 
+    /// Parses an equality expression.
+    ///
+    /// Grammar rule:
+    ///
+    ///   equality: comparison ( ( '!=' | '==' ) comparison )*
     fn parse_equality(&mut self) -> Result<Expr> {
         let token_types = [TokenType::EqualEqual, TokenType::BangEqual];
         self.parse_binary_expr(&token_types, Self::parse_comparison)
     }
 
+    /// Parses a comparison expression.
+    ///
+    /// Grammar rule:
+    ///
+    ///   comparison: term ( ( '>' | '>=' | '<' | '<=' ) term )*
     fn parse_comparison(&mut self) -> Result<Expr> {
         let token_types = [
             TokenType::Greater,
@@ -135,16 +172,32 @@ impl Parser {
         self.parse_binary_expr(&token_types, Self::parse_term)
     }
 
+    /// Parses a term expression.
+    ///
+    /// Grammar rule:
+    ///
+    ///   term: factor ( ( '-' | '+' ) factor )*
     fn parse_term(&mut self) -> Result<Expr> {
         let token_types = [TokenType::Plus, TokenType::Minus];
         self.parse_binary_expr(&token_types, Self::parse_factor)
     }
 
+    /// Parses a factor expression.
+    ///
+    /// Grammar rule:
+    ///
+    ///   factor: unary ( ( '*' | '/' ) unary )*
     fn parse_factor(&mut self) -> Result<Expr> {
         let token_types = [TokenType::Star, TokenType::Slash];
         self.parse_binary_expr(&token_types, Self::parse_unary)
     }
 
+    /// Parses a unary expression.
+    ///
+    /// Grammar rule:
+    ///
+    ///   unary: ( '!' | '-' ) unary
+    ///        | primary
     fn parse_unary(&mut self) -> Result<Expr> {
         let token_types = [TokenType::Minus, TokenType::Bang];
         if let Some(token) = self.tokens.consume_if_has_token_type(&token_types) {
@@ -176,6 +229,17 @@ impl Parser {
         })
     }
 
+    /// Parses a primary expression.
+    ///
+    /// Grammar rule:
+    ///
+    ///   primary: Number
+    ///          | String
+    ///          | Identifier
+    ///          | true
+    ///          | false
+    ///          | nil
+    ///          | '(' expression ')' aka. grouping expression
     fn parse_primary(&mut self) -> Result<Expr> {
         let token = self.tokens.consume();
         let expr: Result<Expr> = match token.token_type {

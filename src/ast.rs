@@ -1,7 +1,25 @@
 // Copyright (c) 2024 Andi Hellmund. All rights reserved.
-
+//
 // This work is licensed under the terms of the BSD-3-Clause license.
 // For a copy, see <https://opensource.org/license/bsd-3-clause>.
+
+//! Type definitions for Abstract Syntax Tree.
+//!
+//! An abstract syntax tree gets composed of individual nodes, e.g. a node for binary expressions.
+//! The nodes get arranged in a (hierarchical) tree structure. For example, the Lox statement
+//!
+//!   var a = 12 + 4 * 1;
+//!
+//! gets represented as
+//!
+//!   VarDecl-Stmt
+//!     < a >
+//!     BinaryExpr
+//!       < + >
+//!       BinaryExpr
+//!         < * >
+//!         < 4 >
+//!         < 1 >
 
 use crate::diagnostics::LocationSpan;
 

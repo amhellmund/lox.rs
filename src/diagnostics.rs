@@ -1,13 +1,19 @@
 // Copyright (c) 2024 Andi Hellmund. All rights reserved.
-
+//
 // This work is licensed under the terms of the BSD-3-Clause license.
 // For a copy, see <https://opensource.org/license/bsd-3-clause>.
+
+//! Utility for issuing diagnostics from Lox scripts and expressions.
+//!
+//! A diagnostic gets represented by the `DiagnosticError` that is supposed to be used with
+//! `Result<T,E>` types.
 
 use std::error;
 use std::fmt;
 use std::path::PathBuf;
 
-/// Location in the code file.
+/// A `Location` represents a scalar location of an entity (e.g. Token or Expression)
+/// in the input.
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub struct Location {
     pub line: i64,
@@ -26,6 +32,9 @@ impl ToString for Location {
     }
 }
 
+/// A span indicatese a slice in the input with a start and end location.
+///
+/// The end location is thereby considered inclusive.
 #[derive(PartialEq, Debug, Copy, Clone)]
 pub struct LocationSpan {
     pub start: Location,
