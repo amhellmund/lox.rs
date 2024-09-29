@@ -7,7 +7,7 @@
 //!
 //! The syntax and reference of the Lox programming langauge is documented here:
 //!
-//!   https://craftinginterpreters.com/the-lox-language.html
+//!   <https://craftinginterpreters.com/the-lox-language.html>
 //!
 //! The terms and notations will be re-used in the code and documentation of the
 //! individual functions to better map them.
