@@ -14,7 +14,7 @@ use std::path::PathBuf;
 
 use anyhow::Result;
 
-use crate::diagnostics::{DiagnosticError, FileLocation, Location};
+use crate::diagnostics::{emit_diagnostic, FileLocation, Location};
 use crate::scanner::char_sequence::CharSequence;
 
 #[derive(Debug, PartialEq, Clone, Copy)]
@@ -192,12 +192,11 @@ impl Tokenizer {
                         } else if def_char.is_whitespace() {
                             self.content.advance(1);
                         } else {
-                            return Err(DiagnosticError::new(
+                            return Err(emit_diagnostic(
                                 format!("Invalid character detected: '{}'", def_char),
                                 FileLocation::SinglePoint(self.content.location()),
-                                self.source_file,
-                            )
-                            .into());
+                                &self.source_file,
+                            ));
                         }
                     }
                 }
@@ -315,12 +314,11 @@ impl Tokenizer {
             if ch == '"' {
                 break;
             } else if ch == '\n' {
-                return Err(DiagnosticError::new(
+                return Err(emit_diagnostic(
                     format!("Unfinished string literal: '{}'", lexeme),
                     FileLocation::SinglePoint(self.content.location()),
-                    self.source_file.clone(),
-                )
-                .into());
+                    &self.source_file,
+                ));
             }
             lexeme.push(ch);
             pos += 1;

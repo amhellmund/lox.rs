@@ -17,7 +17,7 @@ mod token_sequence;
 use std::path::PathBuf;
 
 use crate::ast::{BinaryOperator, Expr, Literal, Stmt, UnaryOperator};
-use crate::diagnostics::{DiagnosticError, FileLocation, Location, LocationSpan};
+use crate::diagnostics::{emit_diagnostic, FileLocation, Location, LocationSpan};
 use crate::scanner::{Token, TokenType};
 use anyhow::Result;
 
@@ -74,6 +74,16 @@ impl Parser {
         )
     }
 
+    fn create_location_span_from_token(token: &Token) -> LocationSpan {
+        LocationSpan::new(
+            token.location,
+            Location::new(
+                token.location.line,
+                token.location.column + token.lexeme.len() as i64 - 1,
+            ),
+        )
+    }
+
     /// Consumes the current token if it has one of the given types types.
     ///
     /// In case the current token has one of the given token types, the current
@@ -114,16 +124,15 @@ impl Parser {
             self.tokens.advance();
             Ok(token)
         } else {
-            Err(DiagnosticError::new(
+            Err(emit_diagnostic(
                 format!(
                     "Expected token '{}', but got: '{}'",
                     token_type.to_string(),
                     token.token_type.to_string(),
                 ),
                 FileLocation::SinglePoint(token.location),
-                self.source_file.clone(),
-            )
-            .into())
+                &self.source_file,
+            ))
         }
     }
 
@@ -176,13 +185,7 @@ impl Parser {
             // The init expression is set to 'nil' in case there is no initializer.
             init_expr = Box::new(Expr::Literal {
                 literal: Literal::Nil,
-                loc: LocationSpan::new(
-                    identifier.location,
-                    Location::new(
-                        identifier.location.line,
-                        identifier.location.column + identifier.lexeme.len() as i64 - 1,
-                    ),
-                ),
+                loc: Self::create_location_span_from_token(&identifier),
             });
         }
 
@@ -243,11 +246,6 @@ impl Parser {
             loc: LocationSpan::new(start_loc, semicolon_token.location),
         })
     }
-
-    // Ok(Stmt::Print(Expr::Literal {
-    //     literal: Literal::Nil,
-    //     loc: LocationSpan::new(Location::new(1, 1), Location::new(1, 1)),
-    // }))
 
     /// Parses an expression (lowest precedence -> highest in AST (sub)hierarchy).
     ///
@@ -414,24 +412,22 @@ impl Parser {
                     });
                 } else {
                     let cur_token = self.tokens.current();
-                    return Err(DiagnosticError::new(
+                    return Err(emit_diagnostic(
                         format!(
                             "Expected closing paranthesis, but got: '{}'",
                             &cur_token.lexeme
                         ),
                         FileLocation::SinglePoint(token.location),
-                        self.source_file.clone(),
-                    )
-                    .into());
+                        &self.source_file,
+                    ));
                 }
             }
             _ => {
-                return Err(DiagnosticError::new(
+                return Err(emit_diagnostic(
                     format!("Unexpected token: '{}'", token.lexeme),
                     FileLocation::SinglePoint(token.location),
-                    self.source_file.clone(),
-                )
-                .into());
+                    &self.source_file,
+                ))
             }
         };
         expr

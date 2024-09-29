@@ -74,6 +74,14 @@ impl ToString for FileLocation {
     }
 }
 
+pub fn emit_diagnostic(
+    message: String,
+    location: FileLocation,
+    source_file: &PathBuf,
+) -> anyhow::Error {
+    DiagnosticError::new(message.into(), location, source_file.clone()).into()
+}
+
 #[derive(Debug)]
 pub struct DiagnosticError {
     pub message: String,
