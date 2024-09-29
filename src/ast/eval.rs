@@ -8,7 +8,7 @@
 //! This module provides functions to execute (and thereby) eval nodes
 //! of the AST.
 
-use std::path::PathBuf;
+use std::{io::Write, path::PathBuf};
 
 use anyhow::Result;
 
@@ -19,21 +19,29 @@ use crate::{
 
 use super::{BinaryOperator, Stmt, UnaryOperator};
 
-pub fn eval_stmt(stmt: &Stmt, source_file: PathBuf) -> Result<()> {
-    let evaluator = StmtEvaluator::new(source_file);
+pub fn eval_stmt<'a, W: Write>(
+    stmt: &Stmt,
+    source_file: PathBuf,
+    output_writer: &'a mut W,
+) -> Result<()> {
+    let mut evaluator = StmtEvaluator::<'a, W>::new(source_file, output_writer);
     evaluator.eval(stmt)
 }
 
-struct StmtEvaluator {
+struct StmtEvaluator<'a, W: Write> {
     source_file: PathBuf,
+    output_writer: &'a mut W,
 }
 
-impl StmtEvaluator {
-    fn new(source_file: PathBuf) -> Self {
-        StmtEvaluator { source_file }
+impl<'a, W: Write> StmtEvaluator<'a, W> {
+    fn new(source_file: PathBuf, output_writer: &'a mut W) -> Self {
+        StmtEvaluator {
+            source_file,
+            output_writer,
+        }
     }
 
-    fn eval(&self, stmt: &Stmt) -> Result<()> {
+    fn eval(&mut self, stmt: &Stmt) -> Result<()> {
         match stmt {
             Stmt::List(statements) => {
                 for stmt in statements {
@@ -44,7 +52,8 @@ impl StmtEvaluator {
             Stmt::Expr { .. } => todo!(),
             Stmt::Print { expr, .. } => {
                 let expr_value = eval_expr(expr, self.source_file.clone())?;
-                println!("{}", expr_value.to_string());
+                self.output_writer
+                    .write_fmt(format_args!("{}\n", expr_value.to_string()))?;
             }
         }
         Ok(())
@@ -296,10 +305,11 @@ impl ExprEvaluator {
 
 #[cfg(test)]
 mod tests {
+    use std::io::{Read, Seek};
     use std::path::PathBuf;
 
-    use super::{eval_expr, ExprValue};
-    use crate::ast::{BinaryOperator, Expr, Literal, UnaryOperator};
+    use super::{eval_expr, eval_stmt, ExprValue};
+    use crate::ast::{BinaryOperator, Expr, Literal, Stmt, UnaryOperator};
     use crate::diagnostics::{Location, LocationSpan};
 
     fn default_loc_span() -> LocationSpan {
@@ -591,5 +601,29 @@ mod tests {
         ];
 
         run_test_eval_with_expected_errors(test_data);
+    }
+
+    fn run_eval_stmt_with_capture_output(stmt: &Stmt) -> String {
+        let mut output_writer = std::io::Cursor::new(Vec::<u8>::new());
+        eval_stmt(&stmt, "in-memory".into(), &mut output_writer).unwrap();
+        output_writer.seek(std::io::SeekFrom::Start(0)).unwrap();
+        let mut string_output = String::new();
+        let _ = output_writer.read_to_string(&mut string_output);
+        let trimmed_output = String::from(string_output.trim_end());
+        trimmed_output
+    }
+
+    #[test]
+    fn test_eval_print_statement() {
+        let ast = Stmt::Print {
+            expr: Box::new(new_binary_expr(
+                BinaryOperator::Add,
+                new_literal_expr(Literal::Number(1.0)),
+                new_literal_expr(Literal::Number(2.0)),
+            )),
+            loc: default_loc_span(),
+        };
+        let captured_output = run_eval_stmt_with_capture_output(&ast);
+        assert_eq!(captured_output, String::from("3"));
     }
 }

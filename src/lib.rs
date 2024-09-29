@@ -33,7 +33,7 @@ pub fn execute(file_path: &Path, show_ast: bool) -> Result<()> {
     let ast = parser::parse(tokens, file_path.to_path_buf())
         .with_context(|| "Failed to parse the input file")?;
 
-    eval_stmt(&ast, file_path.to_path_buf())?;
+    eval_stmt(&ast, file_path.to_path_buf(), &mut std::io::stdout())?;
 
     if show_ast {
         let ast_as_string = print_ast(&ast);
@@ -67,7 +67,7 @@ fn repl_impl(content: String) -> Result<()> {
     let file_path = PathBuf::from("repl");
     let tokens = scanner::tokenize(&content, file_path.to_path_buf())?;
     let ast_expr = parser::parse(tokens, file_path.to_path_buf())?;
-    eval_stmt(&ast_expr, file_path.to_path_buf())?;
+    eval_stmt(&ast_expr, file_path.to_path_buf(), &mut std::io::stdout())?;
     Ok(())
 }
 
