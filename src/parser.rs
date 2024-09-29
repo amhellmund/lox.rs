@@ -457,6 +457,13 @@ mod tests {
         tokens
     }
 
+    pub fn loc_span(start: (i64, i64), end_inclusive: (i64, i64)) -> LocationSpan {
+        LocationSpan {
+            start: Location::new(start.0, start.1),
+            end_inclusive: Location::new(end_inclusive.0, end_inclusive.1),
+        }
+    }
+
     #[test]
     fn test_build_token_sequence() {
         let tokens = build_token_sequence(vec![TokenType::And, TokenType::Identifier]);
@@ -594,9 +601,9 @@ mod tests {
         let expected_ast = Expr::Grouping {
             expr: Box::new(Expr::Literal {
                 literal: Literal::Number(0.0),
-                loc: LocationSpan::new(Location::new(2, 1), Location::new(2, 3)),
+                loc: loc_span((2, 1), (2, 3)),
             }),
-            loc: LocationSpan::new(Location::new(1, 1), Location::new(3, 1)),
+            loc: loc_span((1, 1), (3, 1)),
         };
 
         let ast = parse_expr(tokens).unwrap();
@@ -626,14 +633,14 @@ mod tests {
             let expected_ast = Expr::Binary {
                 lhs: Box::new(Expr::Literal {
                     literal: Literal::Number(0.0),
-                    loc: LocationSpan::new(Location::new(1, 1), Location::new(1, 3)),
+                    loc: loc_span((1, 1), (1, 3)),
                 }),
                 op: binary_op,
                 rhs: Box::new(Expr::Literal {
                     literal: Literal::Number(0.0),
-                    loc: LocationSpan::new(Location::new(3, 1), Location::new(3, 3)),
+                    loc: loc_span((3, 1), (3, 3)),
                 }),
-                loc: LocationSpan::new(Location::new(1, 1), Location::new(3, 3)),
+                loc: loc_span((1, 1), (3, 3)),
             };
             let ast = parse_expr(tokens).unwrap();
             assert_eq!(ast, expected_ast);
@@ -652,9 +659,9 @@ mod tests {
                 op: unary_op,
                 expr: Box::new(Expr::Literal {
                     literal: Literal::Number(0.0),
-                    loc: LocationSpan::new(Location::new(2, 1), Location::new(2, 3)),
+                    loc: loc_span((2, 1), (2, 3)),
                 }),
-                loc: LocationSpan::new(Location::new(1, 1), Location::new(2, 3)),
+                loc: loc_span((1, 1), (2, 3)),
             };
             let ast: Expr = parse_expr(tokens).unwrap();
             assert_eq!(ast, expected_ast);
@@ -672,9 +679,9 @@ mod tests {
             identifier: String::from("identifier"),
             init_expr: Box::new(Expr::Literal {
                 literal: Literal::Nil,
-                loc: LocationSpan::new(Location::new(2, 1), Location::new(2, 10)),
+                loc: loc_span((2, 1), (2, 10)),
             }),
-            loc: LocationSpan::new(Location::new(1, 1), Location::new(3, 1)),
+            loc: loc_span((1, 1), (3, 1)),
         };
         let ast = parse_stmt(tokens).unwrap();
         assert_eq!(ast, expected_ast);
@@ -693,9 +700,9 @@ mod tests {
             identifier: String::from("identifier"),
             init_expr: Box::new(Expr::Literal {
                 literal: Literal::Number(0.0),
-                loc: LocationSpan::new(Location::new(4, 1), Location::new(4, 3)),
+                loc: loc_span((4, 1), (4, 3)),
             }),
-            loc: LocationSpan::new(Location::new(1, 1), Location::new(5, 1)),
+            loc: loc_span((1, 1), (5, 1)),
         };
         let ast = parse_stmt(tokens).unwrap();
         assert_eq!(ast, expected_ast);
@@ -727,9 +734,9 @@ mod tests {
         let expected_ast = Stmt::Print {
             expr: Box::new(Expr::Literal {
                 literal: Literal::Number(0.0),
-                loc: LocationSpan::new(Location::new(2, 1), Location::new(2, 3)),
+                loc: loc_span((2, 1), (2, 3)),
             }),
-            loc: LocationSpan::new(Location::new(1, 1), Location::new(3, 1)),
+            loc: loc_span((1, 1), (3, 1)),
         };
         let ast = parse_stmt(tokens).unwrap();
         assert_eq!(ast, expected_ast);
@@ -752,9 +759,9 @@ mod tests {
         let expected_ast = Stmt::Expr {
             expr: Box::new(Expr::Literal {
                 literal: Literal::Number(0.0),
-                loc: LocationSpan::new(Location::new(1, 1), Location::new(1, 3)),
+                loc: loc_span((1, 1), (1, 3)),
             }),
-            loc: LocationSpan::new(Location::new(1, 1), Location::new(2, 1)),
+            loc: loc_span((1, 1), (2, 1)),
         };
         let ast = parse_stmt(tokens).unwrap();
         assert_eq!(ast, expected_ast);
