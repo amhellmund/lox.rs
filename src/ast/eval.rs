@@ -66,14 +66,14 @@ pub fn eval_stmt<'a, W: Write>(
 }
 
 /// Runtime evaluator for Lox AST nodes.
-struct Evaluator<'a, W: Write> {
+pub struct Evaluator<'a, W: Write> {
     source_file: PathBuf,
     env: ExecutionEnvironment,
     output_writer: Option<&'a mut W>,
 }
 
 impl<'a, W: Write> Evaluator<'a, W> {
-    fn new(source_file: PathBuf, output_writer: Option<&'a mut W>) -> Self {
+    pub fn new(source_file: PathBuf, output_writer: Option<&'a mut W>) -> Self {
         Evaluator {
             source_file,
             env: ExecutionEnvironment::new(),
@@ -81,7 +81,7 @@ impl<'a, W: Write> Evaluator<'a, W> {
         }
     }
 
-    fn eval(&mut self, stmt: &Stmt) -> Result<()> {
+    pub fn eval(&mut self, stmt: &Stmt) -> Result<()> {
         match stmt {
             Stmt::List(statements) => {
                 for stmt in statements {

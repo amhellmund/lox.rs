@@ -8,7 +8,7 @@
 //! [`Lox`]: https://craftinginterpreters.com/the-lox-language.html
 
 use anyhow::{Context, Result};
-use ast::eval::eval_stmt;
+use ast::eval::{eval_stmt, Evaluator};
 use ast::printer::print_ast;
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -47,6 +47,8 @@ pub fn execute(file_path: &Path, show_ast: bool) -> Result<()> {
 ///
 /// Currently, only expressions are supported by the implementation.
 pub fn repl() -> Result<()> {
+    let mut output_writer = std::io::stdout();
+    let mut evaluator = Evaluator::new("repl".into(), Some(&mut output_writer));
     loop {
         print!("lox> ");
         io::stdout().flush()?;
@@ -57,22 +59,18 @@ pub fn repl() -> Result<()> {
             break;
         }
 
-        if let Err(err) = repl_impl(content) {
+        if let Err(err) = repl_impl(content, &mut evaluator) {
             println!("Error: {}", err)
         }
     }
     Ok(())
 }
 
-fn repl_impl(content: String) -> Result<()> {
+fn repl_impl<'a, W: Write>(content: String, evaluator: &mut Evaluator<'a, W>) -> Result<()> {
     let file_path = PathBuf::from("repl");
     let tokens = scanner::tokenize(&content, file_path.to_path_buf())?;
     let ast_expr = parser::parse(tokens, file_path.to_path_buf())?;
-    eval_stmt(
-        &ast_expr,
-        file_path.to_path_buf(),
-        Some(&mut std::io::stdout()),
-    )?;
+    evaluator.eval(&ast_expr)?;
     Ok(())
 }
 
