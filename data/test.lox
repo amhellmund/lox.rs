@@ -1,8 +1,3 @@
-var a = "before" / b;
-print a;
-
-// a = "after";
-print a; // expect: after
-
-print "arg";
-print a; // expect:
+var a = 12.0;
+var b = 24.0;
+print (a + b + cd);

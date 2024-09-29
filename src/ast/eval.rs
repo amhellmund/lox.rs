@@ -8,66 +8,22 @@
 //! This module provides functions to execute (and thereby) eval nodes
 //! of the AST.
 
+mod environment;
+
 use std::{io::Write, path::PathBuf};
 
 use anyhow::Result;
+use environment::ExecutionEnvironment;
 
 use crate::{
     ast::{Expr, Literal},
-    diagnostics::{DiagnosticError, FileLocation, LocationSpan},
+    diagnostics::{emit_diagnostic, DiagnosticError, FileLocation, LocationSpan},
 };
 
 use super::{BinaryOperator, Stmt, UnaryOperator};
 
-pub fn eval_stmt<'a, W: Write>(
-    stmt: &Stmt,
-    source_file: PathBuf,
-    output_writer: &'a mut W,
-) -> Result<()> {
-    let mut evaluator = StmtEvaluator::<'a, W>::new(source_file, output_writer);
-    evaluator.eval(stmt)
-}
-
-struct StmtEvaluator<'a, W: Write> {
-    source_file: PathBuf,
-    output_writer: &'a mut W,
-}
-
-impl<'a, W: Write> StmtEvaluator<'a, W> {
-    fn new(source_file: PathBuf, output_writer: &'a mut W) -> Self {
-        StmtEvaluator {
-            source_file,
-            output_writer,
-        }
-    }
-
-    fn eval(&mut self, stmt: &Stmt) -> Result<()> {
-        match stmt {
-            Stmt::List(statements) => {
-                for stmt in statements {
-                    self.eval(stmt)?
-                }
-            }
-            Stmt::VarDecl { .. } => todo!(),
-            Stmt::Expr { .. } => todo!(),
-            Stmt::Print { expr, .. } => {
-                let expr_value = eval_expr(expr, self.source_file.clone())?;
-                self.output_writer
-                    .write_fmt(format_args!("{}\n", expr_value.to_string()))?;
-            }
-        }
-        Ok(())
-    }
-}
-
-/// Evaluates the `Expr` node of the AST into an `ExprValue`.
-fn eval_expr(expr: &Expr, source_file: PathBuf) -> Result<ExprValue> {
-    let evaluator = ExprEvaluator::new(source_file);
-    evaluator.eval(expr)
-}
-
 /// Result of evaluating an expression node of the AST.
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Debug, Clone)]
 pub enum ExprValue {
     Number(f64),
     String(String),
@@ -97,22 +53,78 @@ impl ToString for ExprValue {
     }
 }
 
-struct ExprEvaluator {
+/// Evaluates the statement node.
+///
+/// The output of the evaluation, e.g. from `print` statements get written to the `output_writer`.
+pub fn eval_stmt<'a, W: Write>(
+    stmt: &Stmt,
     source_file: PathBuf,
+    output_writer: Option<&'a mut W>,
+) -> Result<()> {
+    let mut evaluator = Evaluator::new(source_file, output_writer);
+    evaluator.eval(stmt)
 }
 
-impl ExprEvaluator {
-    fn new(source_file: PathBuf) -> Self {
-        ExprEvaluator { source_file }
+/// Runtime evaluator for Lox AST nodes.
+struct Evaluator<'a, W: Write> {
+    source_file: PathBuf,
+    env: ExecutionEnvironment,
+    output_writer: Option<&'a mut W>,
+}
+
+impl<'a, W: Write> Evaluator<'a, W> {
+    fn new(source_file: PathBuf, output_writer: Option<&'a mut W>) -> Self {
+        Evaluator {
+            source_file,
+            env: ExecutionEnvironment::new(),
+            output_writer,
+        }
     }
 
-    fn eval(&self, expr: &Expr) -> Result<ExprValue> {
+    fn eval(&mut self, stmt: &Stmt) -> Result<()> {
+        match stmt {
+            Stmt::List(statements) => {
+                for stmt in statements {
+                    self.eval(stmt)?
+                }
+            }
+            Stmt::VarDecl {
+                identifier,
+                init_expr,
+                ..
+            } => {
+                let expr_value = self.eval_expr(init_expr)?;
+                self.env.define_variable(identifier, expr_value);
+            }
+            Stmt::Expr { .. } => todo!(),
+            Stmt::Print { expr, .. } => {
+                let expr_value = self.eval_expr(expr)?;
+                if let Some(writer) = &mut self.output_writer {
+                    writer.write_fmt(format_args!("{}\n", expr_value.to_string()))?;
+                }
+            }
+        }
+        Ok(())
+    }
+
+    /// Evaluates the `Expr` node of the AST into an `ExprValue`.
+    fn eval_expr(&mut self, expr: &Expr) -> Result<ExprValue> {
         match expr {
             Expr::Binary { lhs, op, rhs, loc } => self.eval_binary_expr(op, lhs, rhs, loc),
-            Expr::Grouping { expr, .. } => self.eval(expr),
+            Expr::Grouping { expr, .. } => self.eval_expr(expr),
             Expr::Literal { literal, .. } => self.eval_literal(&literal),
             Expr::Unary { op, expr, loc } => self.eval_unary_expr(op, expr, loc),
-            Expr::Variable { .. } => todo!(),
+            Expr::Variable { name, loc } => {
+                if let Some(value) = self.env.get_variable(name) {
+                    Ok(value.clone())
+                } else {
+                    Err(emit_diagnostic(
+                        format!("Identifier '{}' has not been defined", name),
+                        FileLocation::Span(*loc),
+                        &self.source_file,
+                    ))
+                }
+            }
         }
     }
 
@@ -126,12 +138,12 @@ impl ExprEvaluator {
     }
 
     fn eval_unary_expr(
-        &self,
+        &mut self,
         op: &UnaryOperator,
         expr: &Expr,
         loc: &LocationSpan,
     ) -> Result<ExprValue> {
-        let result = self.eval(expr)?;
+        let result = self.eval_expr(expr)?;
         match op {
             UnaryOperator::Minus => {
                 if let ExprValue::Number(value) = &result {
@@ -165,14 +177,14 @@ impl ExprEvaluator {
     }
 
     fn eval_binary_expr(
-        &self,
+        &mut self,
         op: &BinaryOperator,
         lhs: &Expr,
         rhs: &Expr,
         loc: &LocationSpan,
     ) -> Result<ExprValue> {
-        let lhs_value = self.eval(lhs)?;
-        let rhs_value = self.eval(rhs)?;
+        let lhs_value = self.eval_expr(lhs)?;
+        let rhs_value = self.eval_expr(rhs)?;
 
         match lhs_value {
             ExprValue::Number(_) => self.eval_binary_op_for_number(op, &lhs_value, &rhs_value, loc),
@@ -306,10 +318,10 @@ impl ExprEvaluator {
 
 #[cfg(test)]
 mod tests {
-    use std::io::{Read, Seek};
-    use std::path::PathBuf;
+    use std::io::{Read, Seek, Write};
 
-    use super::{eval_expr, eval_stmt, ExprValue};
+    use super::{eval_stmt, ExprValue};
+    use crate::ast::eval::Evaluator;
     use crate::ast::{BinaryOperator, Expr, Literal, Stmt, UnaryOperator};
     use crate::diagnostics::{Location, LocationSpan};
 
@@ -367,16 +379,35 @@ mod tests {
         }
     }
 
+    struct TestCursor {}
+
+    impl Write for TestCursor {
+        fn write(&mut self, _: &[u8]) -> std::io::Result<usize> {
+            Ok(0)
+        }
+
+        fn flush(&mut self) -> std::io::Result<()> {
+            Ok(())
+        }
+    }
+
+    // Creates a new evaluator for tests without an `output_writer` defined.
+    fn new_test_evaluator() -> Evaluator<'static, TestCursor> {
+        Evaluator::<TestCursor>::new("in-memory".into(), None)
+    }
+
     fn run_test_eval(test_data: Vec<(Expr, ExprValue)>) {
         for (expr, expected_value) in test_data {
-            let value = eval_expr(&expr, PathBuf::from("in-memory")).unwrap();
+            let mut evaluator = new_test_evaluator();
+            let value = evaluator.eval_expr(&expr).unwrap();
             assert_eq!(value, expected_value);
         }
     }
 
     fn run_test_eval_with_expected_errors(test_data: Vec<(Expr, &str)>) {
         for (expr, expected_error) in test_data {
-            let value = eval_expr(&expr, PathBuf::from("in-memory"));
+            let mut evaluator = new_test_evaluator();
+            let value = evaluator.eval_expr(&expr);
             assert!(value.is_err_and(|err| err.to_string().contains(expected_error)));
         }
     }
@@ -606,7 +637,7 @@ mod tests {
 
     fn run_eval_stmt_with_capture_output(stmt: &Stmt) -> String {
         let mut output_writer = std::io::Cursor::new(Vec::<u8>::new());
-        eval_stmt(&stmt, "in-memory".into(), &mut output_writer).unwrap();
+        eval_stmt(&stmt, "in-memory".into(), Some(&mut output_writer)).unwrap();
         output_writer.seek(std::io::SeekFrom::Start(0)).unwrap();
         let mut string_output = String::new();
         let _ = output_writer.read_to_string(&mut string_output);
@@ -626,5 +657,48 @@ mod tests {
         };
         let captured_output = run_eval_stmt_with_capture_output(&ast);
         assert_eq!(captured_output, String::from("3"));
+    }
+
+    #[test]
+    fn test_eval_variable_declaration() {
+        let ast = Stmt::VarDecl {
+            identifier: "name".into(),
+            init_expr: Box::new(new_literal_expr(Literal::Number(2.0))),
+            loc: default_loc_span(),
+        };
+        let mut evaluator = new_test_evaluator();
+        evaluator.eval(&ast).unwrap();
+
+        assert_eq!(
+            evaluator.env.get_variable("name").unwrap(),
+            ExprValue::Number(2.0)
+        );
+    }
+
+    #[test]
+    fn test_eval_variable_usage() {
+        let ast = Stmt::List(vec![
+            Stmt::VarDecl {
+                identifier: "name".into(),
+                init_expr: Box::new(new_literal_expr(Literal::Number(2.0))),
+                loc: default_loc_span(),
+            },
+            Stmt::VarDecl {
+                identifier: "name_copied".into(),
+                init_expr: Box::new(Expr::Variable {
+                    name: "name".into(),
+                    loc: default_loc_span(),
+                }),
+                loc: default_loc_span(),
+            },
+        ]);
+
+        let mut evaluator = new_test_evaluator();
+        evaluator.eval(&ast).unwrap();
+
+        assert_eq!(
+            evaluator.env.get_variable("name_copied").unwrap(),
+            ExprValue::Number(2.0)
+        );
     }
 }
