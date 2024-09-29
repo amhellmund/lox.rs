@@ -112,6 +112,7 @@ impl ExprEvaluator {
             Expr::Grouping { expr, .. } => self.eval(expr),
             Expr::Literal { literal, .. } => self.eval_literal(&literal),
             Expr::Unary { op, expr, loc } => self.eval_unary_expr(op, expr, loc),
+            Expr::Variable { .. } => todo!(),
         }
     }
 

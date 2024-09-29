@@ -4,5 +4,5 @@ print a;
 // a = "after";
 print a; // expect: after
 
-print a = "arg";
+print "arg";
 print a; // expect:

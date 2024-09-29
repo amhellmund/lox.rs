@@ -362,13 +362,14 @@ impl Parser {
     fn create_expr_from_literal_and_token(literal: Literal, token: &Token) -> Result<Expr> {
         Ok(Expr::Literal {
             literal,
-            loc: LocationSpan::new(
-                token.location,
-                Location {
-                    line: token.location.line,
-                    column: token.location.column + token.lexeme.len() as i64 - 1,
-                },
-            ),
+            loc: Self::create_location_span_from_token(token),
+        })
+    }
+
+    fn create_variable_from_token(token: &Token) -> Result<Expr> {
+        Ok(Expr::Variable {
+            name: token.lexeme.clone(),
+            loc: Self::create_location_span_from_token(token),
         })
     }
 
@@ -401,6 +402,7 @@ impl Parser {
                 Literal::Number(token.lexeme.parse()?),
                 &token,
             ),
+            TokenType::Identifier => Self::create_variable_from_token(&token),
             TokenType::LeftParanthesis => {
                 let expr = self.parse_expression()?;
                 if let Some(closing_token) =
@@ -604,6 +606,18 @@ mod tests {
                 loc: loc_span((2, 1), (2, 3)),
             }),
             loc: loc_span((1, 1), (3, 1)),
+        };
+
+        let ast = parse_expr(tokens).unwrap();
+        assert_eq!(ast, expected_ast);
+    }
+
+    #[test]
+    fn test_primary_expr_from_identifier() {
+        let tokens = build_token_sequence(vec![TokenType::Identifier]);
+        let expected_ast = Expr::Variable {
+            name: String::from("identifier"),
+            loc: loc_span((1, 1), (1, 10)),
         };
 
         let ast = parse_expr(tokens).unwrap();

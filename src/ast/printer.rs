@@ -39,7 +39,7 @@ fn print_stmt(stmt: &Stmt, indent: i64) -> String {
             loc,
         } => {
             format!(
-                "{}[VarDecl] [{}]\n{}\"{}\n{}",
+                "{}[VarDecl] [{}]\n{}\"{}\n{}\n",
                 get_indent_as_string(indent),
                 loc.to_string(),
                 get_indent_as_string(indent + INDENT_NEXT_LEVEL),
@@ -49,7 +49,7 @@ fn print_stmt(stmt: &Stmt, indent: i64) -> String {
         }
         Stmt::Expr { expr, loc } => {
             format!(
-                "{}[Expr] [{}]\n{}",
+                "{}[Expr] [{}]\n{}\n",
                 get_indent_as_string(indent),
                 loc.to_string(),
                 print_expr(expr, indent + INDENT_NEXT_LEVEL),
@@ -57,7 +57,7 @@ fn print_stmt(stmt: &Stmt, indent: i64) -> String {
         }
         Stmt::Print { expr, loc } => {
             format!(
-                "{}[Print] [{}]\n{}",
+                "{}[Print] [{}]\n{}\n",
                 get_indent_as_string(indent),
                 loc.to_string(),
                 print_expr(expr, indent + INDENT_NEXT_LEVEL),
@@ -99,6 +99,14 @@ fn print_expr(expr: &Expr, indent: i64) -> String {
                 get_indent_as_string(indent),
                 loc.to_string(),
                 expr_str
+            )
+        }
+        Expr::Variable { name, loc } => {
+            format!(
+                "{}<var: {}> [{}]",
+                get_indent_as_string(indent),
+                name,
+                loc.to_string()
             )
         }
         Expr::Literal {

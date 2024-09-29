@@ -17,7 +17,7 @@ fn main() -> Result<()> {
     let args = Args::parse();
     if let Some(file_path) = args.file_path {
         println!("File argument is {}", file_path.display());
-        lox::execute(&file_path, false)
+        lox::execute(&file_path, true)
     } else {
         lox::repl()
     }
