@@ -60,6 +60,52 @@ pub enum TokenType {
     EndOfFile,
 }
 
+impl ToString for TokenType {
+    fn to_string(&self) -> String {
+        match self {
+            TokenType::LeftParanthesis => String::from("("),
+            TokenType::RightParanthesis => String::from(")"),
+            TokenType::LeftBrace => String::from("{"),
+            TokenType::RightBrace => String::from("}"),
+            TokenType::Comma => String::from(","),
+            TokenType::Dot => String::from("."),
+            TokenType::Minus => String::from("-"),
+            TokenType::Plus => String::from("+"),
+            TokenType::Semicolon => String::from(";"),
+            TokenType::Slash => String::from("/"),
+            TokenType::Star => String::from("*"),
+            TokenType::Bang => String::from("!"),
+            TokenType::BangEqual => String::from("!="),
+            TokenType::Equal => String::from("="),
+            TokenType::EqualEqual => String::from("=="),
+            TokenType::Greater => String::from(">"),
+            TokenType::GreaterOrEqual => String::from(">="),
+            TokenType::Less => String::from("<"),
+            TokenType::LessOrEqual => String::from("<="),
+            TokenType::Identifier => String::from("<identifier>"),
+            TokenType::StringLiteral => String::from("<string-literal>"),
+            TokenType::Number => String::from("<number>"),
+            TokenType::And => String::from("and"),
+            TokenType::Class => String::from("class"),
+            TokenType::Else => String::from("else"),
+            TokenType::False => String::from("false"),
+            TokenType::Fun => String::from("fun"),
+            TokenType::For => String::from("for"),
+            TokenType::If => String::from("if"),
+            TokenType::Nil => String::from("nil"),
+            TokenType::Or => String::from("or"),
+            TokenType::Print => String::from("print"),
+            TokenType::Return => String::from("return"),
+            TokenType::Super => String::from("super"),
+            TokenType::This => String::from("this"),
+            TokenType::True => String::from("true"),
+            TokenType::Var => String::from("var"),
+            TokenType::While => String::from("while"),
+            TokenType::EndOfFile => String::from("<end-of-file>"),
+        }
+    }
+}
+
 /// The token is as the atomic element of the programming language.
 ///
 /// The lexeme contains the matched string within the input program, e.g.

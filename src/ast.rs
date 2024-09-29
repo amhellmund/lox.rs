@@ -114,7 +114,19 @@ impl Expr {
     }
 }
 
-// pub enum Stmt {
-//     Expr(Expr),
-//     Print(Expr),
-// }
+pub enum Stmt {
+    List(Vec<Stmt>),
+    VarDecl {
+        identifier: String,
+        init_expr: Box<Expr>,
+        loc: LocationSpan,
+    },
+    Expr {
+        expr: Box<Expr>,
+        loc: LocationSpan,
+    },
+    Print {
+        expr: Box<Expr>,
+        loc: LocationSpan,
+    },
+}

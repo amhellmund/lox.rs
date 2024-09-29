@@ -8,7 +8,7 @@
 //! [`Lox`]: https://craftinginterpreters.com/the-lox-language.html
 
 use anyhow::{Context, Result};
-use ast::eval::eval_expr;
+use ast::eval::eval_stmt;
 use ast::printer::print_ast;
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -32,14 +32,13 @@ pub fn execute(file_path: &Path, show_ast: bool) -> Result<()> {
     let tokens = scanner::tokenize(&content, file_path.to_path_buf())?;
     let ast = parser::parse(tokens, file_path.to_path_buf())
         .with_context(|| "Failed to parse the input file")?;
-    let expr_value = eval_expr(&ast, file_path.to_path_buf())?;
+
+    eval_stmt(&ast, file_path.to_path_buf())?;
 
     if show_ast {
         let ast_as_string = print_ast(&ast);
         println!("AST:\n{}", ast_as_string);
     }
-
-    println!("Expr: {}", expr_value.to_string());
     Ok(())
 }
 
@@ -68,8 +67,7 @@ fn repl_impl(content: String) -> Result<()> {
     let file_path = PathBuf::from("repl");
     let tokens = scanner::tokenize(&content, file_path.to_path_buf())?;
     let ast_expr = parser::parse(tokens, file_path.to_path_buf())?;
-    let expr_value = eval_expr(&ast_expr, file_path.to_path_buf())?;
-    println!("Result: {}", expr_value.to_string());
+    eval_stmt(&ast_expr, file_path.to_path_buf())?;
     Ok(())
 }
 

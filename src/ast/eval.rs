@@ -17,10 +17,42 @@ use crate::{
     diagnostics::{DiagnosticError, FileLocation, LocationSpan},
 };
 
-use super::{BinaryOperator, UnaryOperator};
+use super::{BinaryOperator, Stmt, UnaryOperator};
+
+pub fn eval_stmt(stmt: &Stmt, source_file: PathBuf) -> Result<()> {
+    let evaluator = StmtEvaluator::new(source_file);
+    evaluator.eval(stmt)
+}
+
+struct StmtEvaluator {
+    source_file: PathBuf,
+}
+
+impl StmtEvaluator {
+    fn new(source_file: PathBuf) -> Self {
+        StmtEvaluator { source_file }
+    }
+
+    fn eval(&self, stmt: &Stmt) -> Result<()> {
+        match stmt {
+            Stmt::List(statements) => {
+                for stmt in statements {
+                    self.eval(stmt)?
+                }
+            }
+            Stmt::VarDecl { .. } => todo!(),
+            Stmt::Expr { .. } => todo!(),
+            Stmt::Print { expr, .. } => {
+                let expr_value = eval_expr(expr, self.source_file.clone())?;
+                println!("{}", expr_value.to_string());
+            }
+        }
+        Ok(())
+    }
+}
 
 /// Evaluates the `Expr` node of the AST into an `ExprValue`.
-pub fn eval_expr(expr: &Expr, source_file: PathBuf) -> Result<ExprValue> {
+fn eval_expr(expr: &Expr, source_file: PathBuf) -> Result<ExprValue> {
     let evaluator = ExprEvaluator::new(source_file);
     evaluator.eval(expr)
 }

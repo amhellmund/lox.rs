@@ -16,7 +16,7 @@ mod token_sequence;
 
 use std::path::PathBuf;
 
-use crate::ast::{BinaryOperator, Expr, Literal, UnaryOperator};
+use crate::ast::{BinaryOperator, Expr, Literal, Stmt, UnaryOperator};
 use crate::diagnostics::{DiagnosticError, FileLocation, Location, LocationSpan};
 use crate::scanner::{Token, TokenType};
 use anyhow::Result;
@@ -24,7 +24,7 @@ use anyhow::Result;
 use token_sequence::TokenSequence;
 
 /// Converts a sequence of tokens into an Abstract Syntax Tree (AST).
-pub fn parse(tokens: Vec<Token>, source_file: PathBuf) -> Result<Expr> {
+pub fn parse(tokens: Vec<Token>, source_file: PathBuf) -> Result<Stmt> {
     let mut parser = Parser::new(tokens, source_file);
     Ok(parser.parse()?)
 }
@@ -74,35 +74,180 @@ impl Parser {
         )
     }
 
-    fn parse(&mut self) -> Result<Expr> {
-        Ok(self.parse_expression()?)
+    /// Consumes the current token if it has one of the given types types.
+    ///
+    /// In case the current token has one of the given token types, the current
+    /// token is returned and the position in the token stream is advanced to
+    /// the next token.
+    ///
+    /// In case the current token does not have the specified token, None is returned.
+    pub fn consume_if_has_token_type(&mut self, token_types: &[TokenType]) -> Option<Token> {
+        let current_token = self.tokens.current();
+        if self.tokens.current_has_token_type(token_types) {
+            self.tokens.advance();
+            return Some(current_token);
+        } else {
+            return None;
+        }
     }
 
-    // fn parse_program(&mut self) -> Result<Vec<Stmt>> {
-    //     let mut statements: Vec<Stmt> = Vec::new();
-    //     while !self.tokens.has_reached_end() {
-    //         statements.push(self.parse_declaration()?);
-    //     }
-    //     Ok(statements)
-    // }
+    /// Consumes the current token, that is the current token gets returned. Beforehand the position
+    /// gets advanced to the next position in the input sequence.
+    ///
+    /// Example: Token Sequence
+    ///  | T01 | T02 | T03 | T04 | EOF |
+    ///           ^
+    /// Token `TO2` gets returned, and the position gets advanced to `T03` at the end of the function.
+    ///
+    /// Note: This function does always return a valid token. In case the `EndOfFile` token has been reached
+    /// in the input sequence, it continuously returns this token.
+    pub fn consume(&mut self) -> Token {
+        let current_token = self.tokens.current();
+        self.tokens.advance();
+        current_token
+    }
 
-    // fn parse_declaration(&mut self) -> Result<Stmt> {
-    //     if self.tokens.current_has_token_type(&[TokenType::Var]) {
-    //         self.tokens.advance();
-    //         self.parse_variable_declaration()
-    //     } else {
-    //         self.parse_statement()
-    //     }
-    // }
+    /// Consumes the current token if it has the specified type, otherwise an error is returned.
+    fn consume_or_error(&mut self, token_type: TokenType) -> Result<Token> {
+        let token = self.tokens.current();
+        if token.token_type == token_type {
+            self.tokens.advance();
+            Ok(token)
+        } else {
+            Err(DiagnosticError::new(
+                format!(
+                    "Expected token '{}', but got: '{}'",
+                    token_type.to_string(),
+                    token.token_type.to_string(),
+                ),
+                FileLocation::SinglePoint(token.location),
+                self.source_file.clone(),
+            )
+            .into())
+        }
+    }
 
-    // fn parse_variable_declaration(&mut self) -> Result<Stmt> {
-    //     if self.tokens.current_has_token_type(&[TokenType::Identifier]) {
-    //         self.tokens.consume();
-    //     } else {
-    //     }
-    // }
+    fn parse(&mut self) -> Result<Stmt> {
+        Ok(self.parse_program()?)
+    }
 
-    // fn parse_statement(&mut self) -> Result<Stmt> {}
+    /// Parses the whole program (or parts of it in case of REPL input).
+    ///
+    /// Grammar rule:
+    ///
+    ///   program: statement* EndOfFile
+    fn parse_program(&mut self) -> Result<Stmt> {
+        let mut declarations: Vec<Stmt> = Vec::new();
+        while !self.tokens.has_reached_end() {
+            declarations.push(self.parse_declaration()?);
+        }
+        Ok(Stmt::List(declarations))
+    }
+
+    /// Parses a declaration.
+    ///
+    /// Grammar rule:
+    ///
+    ///   declaration: variable_declaration
+    ///              | statement
+    fn parse_declaration(&mut self) -> Result<Stmt> {
+        if self.tokens.current_has_token_type(&[TokenType::Var]) {
+            self.parse_variable_declaration()
+        } else {
+            self.parse_statement()
+        }
+    }
+
+    /// Parses variable declaration.
+    ///
+    /// Grammar rule:
+    ///   variable_declaration: 'var' 'identifer'
+    ///                       | 'var' 'identifier' '=' expression ';'
+    ///
+    /// This function assumes that the `Var` token has not yet been consumed.
+    fn parse_variable_declaration(&mut self) -> Result<Stmt> {
+        let var_token = self.consume_or_error(TokenType::Var)?;
+        let identifier = self.consume_or_error(TokenType::Identifier)?;
+
+        let init_expr;
+        if let Some(_) = self.consume_if_has_token_type(&[TokenType::Equal]) {
+            init_expr = Box::new(self.parse_expression()?);
+        } else {
+            // The init expression is set to 'nil' in case there is no initializer.
+            init_expr = Box::new(Expr::Literal {
+                literal: Literal::Nil,
+                loc: LocationSpan::new(
+                    identifier.location,
+                    Location::new(
+                        identifier.location.line,
+                        identifier.location.column + identifier.lexeme.len() as i64 - 1,
+                    ),
+                ),
+            });
+        }
+
+        let semicolon_token = self.consume_or_error(TokenType::Semicolon)?;
+
+        Ok(Stmt::VarDecl {
+            identifier: identifier.lexeme,
+            init_expr,
+            loc: LocationSpan::new(var_token.location, semicolon_token.location),
+        })
+    }
+
+    /// Parses a statement.
+    ///
+    /// Grammar rule:
+    ///
+    ///   statement: print_statement
+    ///            | expression_statement
+    fn parse_statement(&mut self) -> Result<Stmt> {
+        if self.tokens.current_has_token_type(&[TokenType::Print]) {
+            self.parse_print_statement()
+        } else {
+            self.parse_expression_statement()
+        }
+    }
+
+    /// Parses a print statement.
+    ///
+    /// Grammar rule:
+    ///
+    ///   print_statement: 'print' expression ';'
+    ///
+    /// This function assumes that the 'print' token has not yet been consumed.
+    fn parse_print_statement(&mut self) -> Result<Stmt> {
+        let print_token = self.consume_or_error(TokenType::Print)?;
+        let expr = self.parse_expression()?;
+        let semicolon_token = self.consume_or_error(TokenType::Semicolon)?;
+
+        Ok(Stmt::Print {
+            expr: Box::new(expr),
+            loc: LocationSpan::new(print_token.location, semicolon_token.location),
+        })
+    }
+
+    /// Parses an expression statement.
+    ///
+    /// Grammar rule:
+    ///
+    ///   expression_statement: expression ';'
+    fn parse_expression_statement(&mut self) -> Result<Stmt> {
+        let expr = self.parse_expression()?;
+        let semicolon_token = self.consume_or_error(TokenType::Semicolon)?;
+
+        // The start location of the expression gets preserved because the expr gets moved into the statement.
+        let start_loc = expr.get_loc().start;
+        Ok(Stmt::Expr {
+            expr: Box::new(expr),
+            loc: LocationSpan::new(start_loc, semicolon_token.location),
+        })
+    }
+
+    // Ok(Stmt::Print(Expr::Literal {
+    //     literal: Literal::Nil,
+    //     loc: LocationSpan::new(Location::new(1, 1), Location::new(1, 1)),
+    // }))
 
     /// Parses an expression (lowest precedence -> highest in AST (sub)hierarchy).
     ///
@@ -128,7 +273,7 @@ impl Parser {
     ) -> Result<Expr> {
         let mut expr = parse_fn(self)?;
 
-        while let Some(token) = self.tokens.consume_if_has_token_type(&token_types) {
+        while let Some(token) = self.consume_if_has_token_type(&token_types) {
             let op = get_binary_operator_from_token_type(&token.token_type);
 
             let rhs = parse_fn(self)?;
@@ -200,7 +345,7 @@ impl Parser {
     ///        | primary
     fn parse_unary(&mut self) -> Result<Expr> {
         let token_types = [TokenType::Minus, TokenType::Bang];
-        if let Some(token) = self.tokens.consume_if_has_token_type(&token_types) {
+        if let Some(token) = self.consume_if_has_token_type(&token_types) {
             let op = get_unary_operator_from_token_type(&token.token_type);
 
             let expr = self.parse_primary()?;
@@ -233,15 +378,15 @@ impl Parser {
     ///
     /// Grammar rule:
     ///
-    ///   primary: Number
-    ///          | String
-    ///          | Identifier
-    ///          | true
-    ///          | false
-    ///          | nil
-    ///          | '(' expression ')' aka. grouping expression
+    ///   primary: 'number'
+    ///          | 'string'
+    ///          | 'identifier'
+    ///          | 'true'
+    ///          | 'false'
+    ///          | 'nil'
+    ///          | '(' expression ')'
     fn parse_primary(&mut self) -> Result<Expr> {
-        let token = self.tokens.consume();
+        let token = self.consume();
         let expr: Result<Expr> = match token.token_type {
             TokenType::True => {
                 Self::create_expr_from_literal_and_token(Literal::Boolean(true), &token)
@@ -260,9 +405,8 @@ impl Parser {
             ),
             TokenType::LeftParanthesis => {
                 let expr = self.parse_expression()?;
-                if let Some(closing_token) = self
-                    .tokens
-                    .consume_if_has_token_type(&[TokenType::RightParanthesis])
+                if let Some(closing_token) =
+                    self.consume_if_has_token_type(&[TokenType::RightParanthesis])
                 {
                     return Ok(Expr::Grouping {
                         expr: Box::new(expr),
@@ -296,13 +440,13 @@ impl Parser {
 
 #[cfg(test)]
 mod tests {
-    use super::parse;
-
+    use super::Parser;
     use crate::{
         ast::{BinaryOperator, UnaryOperator},
         diagnostics::{Location, LocationSpan},
         scanner::{Token, TokenType},
     };
+    use anyhow::Result;
 
     use crate::ast::{Expr, Literal};
 
@@ -317,12 +461,17 @@ mod tests {
         in_tokens
     }
 
-    fn parse_and_check_literal(
+    fn parse_expr(tokens: Vec<Token>) -> Result<Expr> {
+        let mut parser = Parser::new(tokens, "in-memory".into());
+        parser.parse_expression()
+    }
+
+    fn parse_expr_and_check_literal(
         tokens: Vec<Token>,
         expected_literal: Literal,
         expected_end_inclusive_loc: Location,
     ) {
-        let ast = parse(tokens, "in-memory".into());
+        let ast = parse_expr(tokens);
         assert!(ast.is_ok());
 
         if let Expr::Literal { literal, loc } = ast.unwrap() {
@@ -337,13 +486,67 @@ mod tests {
     }
 
     #[test]
+    fn test_consume() {
+        let tokens = add_eof_to_tokens(vec![Token::new(
+            TokenType::And,
+            Location::new(1, 1),
+            String::from("and"),
+        )]);
+        let mut parser = Parser::new(tokens, "in-memory".into());
+
+        let token = parser.consume();
+        assert_eq!(token.token_type, TokenType::And);
+        assert_eq!(token.location, Location::new(1, 1));
+        assert_eq!(token.lexeme, String::from("and"));
+
+        let eof = parser.consume();
+        assert_eq!(eof.token_type, TokenType::EndOfFile);
+    }
+
+    #[test]
+    fn test_consume_if_has_token_type() {
+        let tokens = add_eof_to_tokens(vec![Token::new(
+            TokenType::And,
+            Location::new(1, 1),
+            String::from("and"),
+        )]);
+        let mut parser = Parser::new(tokens, "in-memory".into());
+
+        assert!(parser
+            .consume_if_has_token_type(&[TokenType::Bang])
+            .is_none());
+        let token = parser.consume_if_has_token_type(&[TokenType::And]).unwrap();
+        assert_eq!(token.token_type, TokenType::And);
+        assert_eq!(token.location, Location::new(1, 1));
+        assert_eq!(token.lexeme, String::from("and"));
+    }
+
+    #[test]
+    fn test_consume_or_error() {
+        let tokens = add_eof_to_tokens(vec![Token::new(
+            TokenType::And,
+            Location::new(1, 1),
+            String::from("and"),
+        )]);
+        let mut parser = Parser::new(tokens, "in-memory".into());
+
+        let result = parser.consume_or_error(TokenType::Bang);
+        assert!(result.is_err());
+
+        let token = parser.consume_or_error(TokenType::And).unwrap();
+        assert_eq!(token.token_type, TokenType::And);
+        assert_eq!(token.location, Location::new(1, 1));
+        assert_eq!(token.lexeme, String::from("and"));
+    }
+
+    #[test]
     fn test_primary_expr_from_number() {
         let tokens = add_eof_to_tokens(vec![Token::new(
             TokenType::Number,
             Location::new(1, 1),
             String::from("12.0"),
         )]);
-        parse_and_check_literal(tokens, Literal::Number(12.0), Location::new(1, 4));
+        parse_expr_and_check_literal(tokens, Literal::Number(12.0), Location::new(1, 4));
     }
 
     #[test]
@@ -353,7 +556,7 @@ mod tests {
             Location::new(1, 1),
             String::from("abc"),
         )]);
-        parse_and_check_literal(
+        parse_expr_and_check_literal(
             tokens,
             Literal::String(String::from("abc")),
             Location::new(1, 3),
@@ -367,7 +570,7 @@ mod tests {
             Location::new(1, 1),
             String::from("true"),
         )]);
-        parse_and_check_literal(tokens, Literal::Boolean(true), Location::new(1, 4));
+        parse_expr_and_check_literal(tokens, Literal::Boolean(true), Location::new(1, 4));
     }
 
     #[test]
@@ -377,7 +580,7 @@ mod tests {
             Location::new(1, 1),
             String::from("false"),
         )]);
-        parse_and_check_literal(tokens, Literal::Boolean(false), Location::new(1, 5));
+        parse_expr_and_check_literal(tokens, Literal::Boolean(false), Location::new(1, 5));
     }
 
     #[test]
@@ -387,7 +590,7 @@ mod tests {
             Location::new(1, 1),
             String::from("nil"),
         )]);
-        parse_and_check_literal(tokens, Literal::Nil, Location::new(1, 3));
+        parse_expr_and_check_literal(tokens, Literal::Nil, Location::new(1, 3));
     }
 
     #[test]
@@ -413,7 +616,7 @@ mod tests {
             loc: LocationSpan::new(Location::new(1, 1), Location::new(1, 3)),
         };
 
-        let ast = parse(tokens, "in-memory".into()).unwrap();
+        let ast = parse_expr(tokens).unwrap();
         assert_eq!(ast, expected_ast);
     }
 
@@ -485,7 +688,7 @@ mod tests {
                 }),
                 loc: LocationSpan::new(Location::new(1, 1), Location::new(1, 2 + lexeme_length)),
             };
-            let ast = parse(tokens, "in-memory".into()).unwrap();
+            let ast = parse_expr(tokens).unwrap();
             assert_eq!(ast, expected_ast);
         }
     }
@@ -509,7 +712,7 @@ mod tests {
                 }),
                 loc: LocationSpan::new(Location::new(1, 1), Location::new(1, 2)),
             };
-            let ast: Expr = parse(tokens, "in-memory".into()).unwrap();
+            let ast: Expr = parse_expr(tokens).unwrap();
             assert_eq!(ast, expected_ast);
         }
     }
@@ -541,7 +744,7 @@ mod tests {
             }),
             loc: LocationSpan::new(Location::new(1, 1), Location::new(3, 4)),
         };
-        let ast = parse(tokens, "in-memory".into()).unwrap();
+        let ast = parse_expr(tokens).unwrap();
         assert_eq!(ast, expected_ast);
     }
 }

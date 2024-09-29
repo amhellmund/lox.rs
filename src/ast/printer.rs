@@ -9,9 +9,13 @@
 
 use crate::ast::{Expr, Literal};
 
+use super::Stmt;
+
+const INDENT_NEXT_LEVEL: i64 = 2;
+
 /// Prints the AST to the command-line
-pub fn print_ast(expr: &Expr) -> String {
-    print_expr(expr, 0)
+pub fn print_ast(stmt: &Stmt) -> String {
+    print_stmt(stmt, 0)
 }
 
 fn get_indent_as_string(indent: i64) -> String {
@@ -20,9 +24,49 @@ fn get_indent_as_string(indent: i64) -> String {
         .collect::<String>()
 }
 
-fn print_expr(expr: &Expr, indent: i64) -> String {
-    const INDENT_NEXT_LEVEL: i64 = 2;
+fn print_stmt(stmt: &Stmt, indent: i64) -> String {
+    match stmt {
+        Stmt::List(statements) => {
+            let mut statement_string = format!("{}[Stmts]\n", get_indent_as_string(indent));
+            for statement in statements {
+                statement_string += &print_stmt(statement, indent + INDENT_NEXT_LEVEL);
+            }
+            statement_string
+        }
+        Stmt::VarDecl {
+            identifier,
+            init_expr,
+            loc,
+        } => {
+            format!(
+                "{}[VarDecl] [{}]\n{}\"{}\n{}",
+                get_indent_as_string(indent),
+                loc.to_string(),
+                get_indent_as_string(indent + INDENT_NEXT_LEVEL),
+                identifier,
+                print_expr(init_expr, indent + INDENT_NEXT_LEVEL),
+            )
+        }
+        Stmt::Expr { expr, loc } => {
+            format!(
+                "{}[Expr] [{}]\n{}",
+                get_indent_as_string(indent),
+                loc.to_string(),
+                print_expr(expr, indent + INDENT_NEXT_LEVEL),
+            )
+        }
+        Stmt::Print { expr, loc } => {
+            format!(
+                "{}[Print] [{}]\n{}",
+                get_indent_as_string(indent),
+                loc.to_string(),
+                print_expr(expr, indent + INDENT_NEXT_LEVEL),
+            )
+        }
+    }
+}
 
+fn print_expr(expr: &Expr, indent: i64) -> String {
     match expr {
         Expr::Binary { lhs, op, rhs, loc } => {
             let lhs_str = print_expr(lhs, indent + INDENT_NEXT_LEVEL);
