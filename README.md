@@ -22,9 +22,11 @@ To work interactively with Lox, start the interpreter in REPL mode by:
 
 An iteractive Lox session in REPL mode could look like
 
-    lox> 1 + 2
-    Result: 3
-    lox> "a" + "b"
-    Result: "ab"
+    lox> var num = 1 + 2;
+    lox> print num;
+    3
+    lox> var str = "a" + "b";
+    lox> print str;
+    ab
     lox> 1 + "2"
     Error: Binary operator '+' only supported for number operands: given number and string [repl@1:1-1:5]
