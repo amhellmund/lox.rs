@@ -446,15 +446,37 @@ mod tests {
 
     use crate::ast::{Expr, Literal};
 
-    fn add_eof_to_tokens(tokens: Vec<Token>) -> Vec<Token> {
-        let mut in_tokens = tokens;
+    fn build_token_sequence(token_types: Vec<TokenType>) -> Vec<Token> {
         let mut loc = Location::new(1, 1);
-        if let Some(last_token) = in_tokens.last() {
-            loc.line = last_token.location.line;
-            loc.column = last_token.location.column + 1;
+        let mut tokens = Vec::<Token>::new();
+        for token_type in token_types {
+            tokens.push(Token::new(token_type, loc, token_type.to_string()));
+            loc.line += 1;
         }
-        in_tokens.push(Token::new(TokenType::EndOfFile, loc, String::default()));
-        in_tokens
+        tokens.push(Token::new(TokenType::EndOfFile, loc, String::default()));
+        tokens
+    }
+
+    #[test]
+    fn test_build_token_sequence() {
+        let tokens = build_token_sequence(vec![TokenType::And, TokenType::Identifier]);
+        assert_eq!(tokens.len(), 3);
+        assert_eq!(
+            tokens[0],
+            Token::new(TokenType::And, Location::new(1, 1), "and".into())
+        );
+        assert_eq!(
+            tokens[1],
+            Token::new(
+                TokenType::Identifier,
+                Location::new(2, 1),
+                "identifier".into()
+            )
+        );
+        assert_eq!(
+            tokens[2],
+            Token::new(TokenType::EndOfFile, Location::new(3, 1), "".into())
+        );
     }
 
     fn parse_expr(tokens: Vec<Token>) -> Result<Expr> {
@@ -483,11 +505,7 @@ mod tests {
 
     #[test]
     fn test_consume() {
-        let tokens = add_eof_to_tokens(vec![Token::new(
-            TokenType::And,
-            Location::new(1, 1),
-            String::from("and"),
-        )]);
+        let tokens = build_token_sequence(vec![TokenType::And]);
         let mut parser = Parser::new(tokens, "in-memory".into());
 
         let token = parser.consume();
@@ -501,11 +519,7 @@ mod tests {
 
     #[test]
     fn test_consume_if_has_token_type() {
-        let tokens = add_eof_to_tokens(vec![Token::new(
-            TokenType::And,
-            Location::new(1, 1),
-            String::from("and"),
-        )]);
+        let tokens = build_token_sequence(vec![TokenType::And]);
         let mut parser = Parser::new(tokens, "in-memory".into());
 
         assert!(parser
@@ -519,11 +533,7 @@ mod tests {
 
     #[test]
     fn test_consume_or_error() {
-        let tokens = add_eof_to_tokens(vec![Token::new(
-            TokenType::And,
-            Location::new(1, 1),
-            String::from("and"),
-        )]);
+        let tokens = build_token_sequence(vec![TokenType::And]);
         let mut parser = Parser::new(tokens, "in-memory".into());
 
         let result = parser.consume_or_error(TokenType::Bang);
@@ -537,79 +547,51 @@ mod tests {
 
     #[test]
     fn test_primary_expr_from_number() {
-        let tokens = add_eof_to_tokens(vec![Token::new(
-            TokenType::Number,
-            Location::new(1, 1),
-            String::from("12.0"),
-        )]);
-        parse_expr_and_check_literal(tokens, Literal::Number(12.0), Location::new(1, 4));
+        let tokens = build_token_sequence(vec![TokenType::Number]);
+        parse_expr_and_check_literal(tokens, Literal::Number(0.0), Location::new(1, 3));
     }
 
     #[test]
     fn test_primary_expr_from_string() {
-        let tokens = add_eof_to_tokens(vec![Token::new(
-            TokenType::StringLiteral,
-            Location::new(1, 1),
-            String::from("abc"),
-        )]);
+        let tokens = build_token_sequence(vec![TokenType::StringLiteral]);
         parse_expr_and_check_literal(
             tokens,
-            Literal::String(String::from("abc")),
-            Location::new(1, 3),
+            Literal::String(String::from("string-literal")),
+            Location::new(1, 15),
         );
     }
 
     #[test]
     fn test_primary_expr_from_boolean_true() {
-        let tokens = add_eof_to_tokens(vec![Token::new(
-            TokenType::True,
-            Location::new(1, 1),
-            String::from("true"),
-        )]);
+        let tokens = build_token_sequence(vec![TokenType::True]);
         parse_expr_and_check_literal(tokens, Literal::Boolean(true), Location::new(1, 4));
     }
 
     #[test]
     fn test_primary_expr_from_boolean_false() {
-        let tokens = add_eof_to_tokens(vec![Token::new(
-            TokenType::False,
-            Location::new(1, 1),
-            String::from("false"),
-        )]);
+        let tokens = build_token_sequence(vec![TokenType::False]);
         parse_expr_and_check_literal(tokens, Literal::Boolean(false), Location::new(1, 5));
     }
 
     #[test]
     fn test_primary_expr_from_boolean_nil() {
-        let tokens = add_eof_to_tokens(vec![Token::new(
-            TokenType::Nil,
-            Location::new(1, 1),
-            String::from("nil"),
-        )]);
+        let tokens = build_token_sequence(vec![TokenType::Nil]);
         parse_expr_and_check_literal(tokens, Literal::Nil, Location::new(1, 3));
     }
 
     #[test]
     fn test_grouping_expr() {
-        let tokens = add_eof_to_tokens(vec![
-            Token::new(
-                TokenType::LeftParanthesis,
-                Location::new(1, 1),
-                String::from("("),
-            ),
-            Token::new(TokenType::Number, Location::new(1, 2), String::from("0")),
-            Token::new(
-                TokenType::RightParanthesis,
-                Location::new(1, 3),
-                String::from(")"),
-            ),
+        let tokens = build_token_sequence(vec![
+            TokenType::LeftParanthesis,
+            TokenType::Number,
+            TokenType::RightParanthesis,
         ]);
         let expected_ast = Expr::Grouping {
             expr: Box::new(Expr::Literal {
                 literal: Literal::Number(0.0),
-                loc: LocationSpan::new(Location::new(1, 2), Location::new(1, 2)),
+                loc: LocationSpan::new(Location::new(2, 1), Location::new(2, 3)),
             }),
-            loc: LocationSpan::new(Location::new(1, 1), Location::new(1, 3)),
+            loc: LocationSpan::new(Location::new(1, 1), Location::new(3, 1)),
         };
 
         let ast = parse_expr(tokens).unwrap();
@@ -619,70 +601,34 @@ mod tests {
     #[test]
     fn test_binary_expr() {
         let test_data = vec![
-            (TokenType::Plus, String::from("+"), BinaryOperator::Add),
-            (
-                TokenType::Minus,
-                String::from("-"),
-                BinaryOperator::Substract,
-            ),
-            (TokenType::Star, String::from("*"), BinaryOperator::Multiply),
-            (TokenType::Slash, String::from("/"), BinaryOperator::Divide),
-            (
-                TokenType::Greater,
-                String::from(">"),
-                BinaryOperator::GreaterThan,
-            ),
+            (TokenType::Plus, BinaryOperator::Add),
+            (TokenType::Minus, BinaryOperator::Substract),
+            (TokenType::Star, BinaryOperator::Multiply),
+            (TokenType::Slash, BinaryOperator::Divide),
+            (TokenType::Greater, BinaryOperator::GreaterThan),
             (
                 TokenType::GreaterOrEqual,
-                String::from(">="),
                 BinaryOperator::GreaterThanOrEqual,
             ),
-            (TokenType::Less, String::from("<"), BinaryOperator::LessThan),
-            (
-                TokenType::LessOrEqual,
-                String::from("<="),
-                BinaryOperator::LessThanOrEqual,
-            ),
-            (
-                TokenType::EqualEqual,
-                String::from("=="),
-                BinaryOperator::Equal,
-            ),
-            (
-                TokenType::BangEqual,
-                String::from("!="),
-                BinaryOperator::NotEqual,
-            ),
+            (TokenType::Less, BinaryOperator::LessThan),
+            (TokenType::LessOrEqual, BinaryOperator::LessThanOrEqual),
+            (TokenType::EqualEqual, BinaryOperator::Equal),
+            (TokenType::BangEqual, BinaryOperator::NotEqual),
         ];
-        for (token_type, lexeme, binary_op) in test_data {
-            let lexeme_length = lexeme.len() as i64;
-            let tokens = add_eof_to_tokens(vec![
-                Token::new(
-                    TokenType::StringLiteral,
-                    Location::new(1, 1),
-                    String::from("a"),
-                ),
-                Token::new(token_type, Location::new(1, 2), lexeme),
-                Token::new(
-                    TokenType::StringLiteral,
-                    Location::new(1, 2 + lexeme_length),
-                    String::from("b"),
-                ),
-            ]);
+        for (token_type, binary_op) in test_data {
+            let tokens =
+                build_token_sequence(vec![TokenType::Number, token_type, TokenType::Number]);
             let expected_ast = Expr::Binary {
                 lhs: Box::new(Expr::Literal {
-                    literal: Literal::String(String::from("a")),
-                    loc: LocationSpan::new(Location::new(1, 1), Location::new(1, 1)),
+                    literal: Literal::Number(0.0),
+                    loc: LocationSpan::new(Location::new(1, 1), Location::new(1, 3)),
                 }),
                 op: binary_op,
                 rhs: Box::new(Expr::Literal {
-                    literal: Literal::String(String::from("b")),
-                    loc: LocationSpan::new(
-                        Location::new(1, 2 + lexeme_length),
-                        Location::new(1, 2 + lexeme_length),
-                    ),
+                    literal: Literal::Number(0.0),
+                    loc: LocationSpan::new(Location::new(3, 1), Location::new(3, 3)),
                 }),
-                loc: LocationSpan::new(Location::new(1, 1), Location::new(1, 2 + lexeme_length)),
+                loc: LocationSpan::new(Location::new(1, 1), Location::new(3, 1)),
             };
             let ast = parse_expr(tokens).unwrap();
             assert_eq!(ast, expected_ast);
@@ -692,21 +638,18 @@ mod tests {
     #[test]
     fn test_unary_expr() {
         let test_data = vec![
-            (TokenType::Minus, String::from("-"), UnaryOperator::Minus),
-            (TokenType::Bang, String::from("!"), UnaryOperator::Not),
+            (TokenType::Minus, UnaryOperator::Minus),
+            (TokenType::Bang, UnaryOperator::Not),
         ];
-        for (token_type, lexeme, unary_op) in test_data {
-            let tokens = add_eof_to_tokens(vec![
-                Token::new(token_type, Location::new(1, 1), lexeme),
-                Token::new(TokenType::Number, Location::new(1, 2), String::from("1")),
-            ]);
+        for (token_type, unary_op) in test_data {
+            let tokens = build_token_sequence(vec![token_type, TokenType::Number]);
             let expected_ast = Expr::Unary {
                 op: unary_op,
                 expr: Box::new(Expr::Literal {
-                    literal: Literal::Number(1.0),
-                    loc: LocationSpan::new(Location::new(1, 2), Location::new(1, 2)),
+                    literal: Literal::Number(0.0),
+                    loc: LocationSpan::new(Location::new(2, 1), Location::new(2, 3)),
                 }),
-                loc: LocationSpan::new(Location::new(1, 1), Location::new(1, 2)),
+                loc: LocationSpan::new(Location::new(1, 1), Location::new(2, 3)),
             };
             let ast: Expr = parse_expr(tokens).unwrap();
             assert_eq!(ast, expected_ast);

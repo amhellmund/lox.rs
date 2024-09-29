@@ -82,9 +82,9 @@ impl ToString for TokenType {
             TokenType::GreaterOrEqual => String::from(">="),
             TokenType::Less => String::from("<"),
             TokenType::LessOrEqual => String::from("<="),
-            TokenType::Identifier => String::from("<identifier>"),
-            TokenType::StringLiteral => String::from("<string-literal>"),
-            TokenType::Number => String::from("<number>"),
+            TokenType::Identifier => String::from("identifier"),
+            TokenType::StringLiteral => String::from("string-literal"),
+            TokenType::Number => String::from("0.0"),
             TokenType::And => String::from("and"),
             TokenType::Class => String::from("class"),
             TokenType::Else => String::from("else"),
@@ -101,7 +101,7 @@ impl ToString for TokenType {
             TokenType::True => String::from("true"),
             TokenType::Var => String::from("var"),
             TokenType::While => String::from("while"),
-            TokenType::EndOfFile => String::from("<end-of-file>"),
+            TokenType::EndOfFile => String::default(),
         }
     }
 }
