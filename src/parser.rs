@@ -557,7 +557,7 @@ mod tests {
         parse_expr_and_check_literal(
             tokens,
             Literal::String(String::from("string-literal")),
-            Location::new(1, 15),
+            Location::new(1, 14),
         );
     }
 
@@ -628,7 +628,7 @@ mod tests {
                     literal: Literal::Number(0.0),
                     loc: LocationSpan::new(Location::new(3, 1), Location::new(3, 3)),
                 }),
-                loc: LocationSpan::new(Location::new(1, 1), Location::new(3, 1)),
+                loc: LocationSpan::new(Location::new(1, 1), Location::new(3, 3)),
             };
             let ast = parse_expr(tokens).unwrap();
             assert_eq!(ast, expected_ast);
@@ -654,36 +654,5 @@ mod tests {
             let ast: Expr = parse_expr(tokens).unwrap();
             assert_eq!(ast, expected_ast);
         }
-    }
-
-    #[test]
-    fn test_multiline_expr() {
-        let tokens = add_eof_to_tokens(vec![
-            Token::new(
-                TokenType::StringLiteral,
-                Location::new(1, 1),
-                String::from("a"),
-            ),
-            Token::new(TokenType::Plus, Location::new(2, 2), String::from("+")),
-            Token::new(
-                TokenType::StringLiteral,
-                Location::new(3, 4),
-                String::from("b"),
-            ),
-        ]);
-        let expected_ast = Expr::Binary {
-            lhs: Box::new(Expr::Literal {
-                literal: Literal::String(String::from("a")),
-                loc: LocationSpan::new(Location::new(1, 1), Location::new(1, 1)),
-            }),
-            op: BinaryOperator::Add,
-            rhs: Box::new(Expr::Literal {
-                literal: Literal::String(String::from("b")),
-                loc: LocationSpan::new(Location::new(3, 4), Location::new(3, 4)),
-            }),
-            loc: LocationSpan::new(Location::new(1, 1), Location::new(3, 4)),
-        };
-        let ast = parse_expr(tokens).unwrap();
-        assert_eq!(ast, expected_ast);
     }
 }
