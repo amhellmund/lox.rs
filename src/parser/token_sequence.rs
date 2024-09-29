@@ -1,16 +1,22 @@
+// Copyright (c) 2024 Andi Hellmund. All rights reserved.
+//
+// This work is licensed under the terms of the BSD-3-Clause license.
+// For a copy, see <https://opensource.org/license/bsd-3-clause>.
+
+//! Utility around a sequence of tokens.
+//!
+//! Precondition: The token sequence must always end with an `EndOfFile` token.
+//!
+//! The token sequence will always return a valid token. In case the `EndOfFile` token
+//! has been reached, it will continuously return this token.
+//!
+//! The utility class provides the following convenience:
+//!
+//!   o consuming (advance+return) a token if the token at the current position has a given type.
+//!   o consuming (advance+return) a token at the current position in the sequence.
+
 use crate::scanner::{Token, TokenType};
 
-/// Utility around a sequence of tokens.
-///
-/// Precondition: The token sequence must always end with an `EndOfFile` token.
-///
-/// The token sequence will always return a valid token. In case the `EndOfFile` token
-/// has been reached, it will continuously return this token.
-///
-/// The utility class provides the following convenience:
-///
-///   o consuming (advance+return) a token if the token at the current position has a given type.
-///   o consuming (advance+return) a token at the current position in the sequence.
 pub struct TokenSequence {
     tokens: Vec<Token>,
     pos: usize,

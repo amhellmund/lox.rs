@@ -1,10 +1,16 @@
+// Copyright (c) 2024 Andi Hellmund. All rights reserved.
+//
+// This work is licensed under the terms of the BSD-3-Clause license.
+// For a copy, see <https://opensource.org/license/bsd-3-clause>.
+
+//! Wrapper around a sequence of characters providing convenience functions:
+//!
+//!   o Look at characters from the current position in the sequence
+//!   o Advance position while updating the location information
+//!   o End-of-sequence check
+
 use crate::diagnostics::Location;
 
-/// Wrapper around a sequence of characters providing convenience functions:
-///
-///   o Look at characters from the current position in the sequence
-///   o Advance position while updating the location information
-///   o End-of-sequence check
 pub struct CharSequence {
     chars: Vec<char>,
     pos: usize,

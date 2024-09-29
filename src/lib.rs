@@ -1,3 +1,7 @@
+// Copyright (c) 2024 Andi Hellmund. All rights reserved.
+// This work is licensed under the terms of the BSD-3-Clause license.
+// For a copy, see <https://opensource.org/license/bsd-3-clause>.
+
 //! A library for scanning, parsing and evaluating the [`Lox`] programming language.
 //!
 //! [`Lox`]: https://craftinginterpreters.com/the-lox-language.html

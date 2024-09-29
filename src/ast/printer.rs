@@ -1,4 +1,18 @@
+// Copyright (c) 2024 Andi Hellmund. All rights reserved.
+//
+// This work is licensed under the terms of the BSD-3-Clause license.
+// For a copy, see <https://opensource.org/license/bsd-3-clause>.
+
+//! Printer for the Abstract Syntax Tree (AST).
+//!
+//! Prints the structure of the AST hierarchically on the command line.
+
 use crate::ast::{Expr, Literal};
+
+/// Prints the AST to the command-line
+pub fn print_ast(expr: &Expr) -> String {
+    print_expr(expr, 0)
+}
 
 fn get_indent_as_string(indent: i64) -> String {
     std::iter::repeat(" ")
@@ -75,8 +89,4 @@ fn print_expr(expr: &Expr, indent: i64) -> String {
             loc.to_string()
         ),
     }
-}
-
-pub fn print_ast(expr: &Expr) -> String {
-    print_expr(expr, 0)
 }

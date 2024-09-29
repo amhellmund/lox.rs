@@ -1,3 +1,13 @@
+// Copyright (c) 2024 Andi Hellmund. All rights reserved.
+//
+// This work is licensed under the terms of the BSD-3-Clause license.
+// For a copy, see <https://opensource.org/license/bsd-3-clause>.
+
+//! Evaluator of Abstract Syntax Tree (AST) nodes.
+//!
+//! This module provides functions to execute (and thereby) eval nodes
+//! of the AST.
+
 use std::path::PathBuf;
 
 use anyhow::Result;
@@ -9,6 +19,13 @@ use crate::{
 
 use super::{BinaryOperator, UnaryOperator};
 
+/// Evaluates the `Expr` node of the AST into an `ExprValue`.
+pub fn eval_expr(expr: &Expr, source_file: PathBuf) -> Result<ExprValue> {
+    let evaluator = ExprEvaluator::new(source_file);
+    evaluator.eval(expr)
+}
+
+/// Result of evaluating an expression node of the AST.
 #[derive(PartialEq, Debug)]
 pub enum ExprValue {
     Number(f64),
@@ -37,11 +54,6 @@ impl ToString for ExprValue {
             ExprValue::String(value) => format!("\"{}\"", value.to_string()),
         }
     }
-}
-
-pub fn eval_expr(expr: &Expr, source_file: PathBuf) -> Result<ExprValue> {
-    let evaluator = ExprEvaluator::new(source_file);
-    evaluator.eval(expr)
 }
 
 struct ExprEvaluator {
