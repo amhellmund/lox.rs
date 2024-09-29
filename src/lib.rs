@@ -44,8 +44,6 @@ pub fn execute(file_path: &Path, show_ast: bool) -> Result<()> {
 }
 
 /// Starts a Lox REPL shell to interactively run statements and expressions.
-///
-/// Currently, only expressions are supported by the implementation.
 pub fn repl() -> Result<()> {
     let mut output_writer = std::io::stdout();
     let mut evaluator = Evaluator::new("repl".into(), Some(&mut output_writer));
