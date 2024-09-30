@@ -84,7 +84,7 @@ impl ToString for TokenType {
             TokenType::LessOrEqual => String::from("<="),
             TokenType::Identifier => String::from("identifier"),
             TokenType::StringLiteral => String::from("string-literal"),
-            TokenType::Number => String::from("0.0"),
+            TokenType::Number => String::from("number"),
             TokenType::And => String::from("and"),
             TokenType::Class => String::from("class"),
             TokenType::Else => String::from("else"),

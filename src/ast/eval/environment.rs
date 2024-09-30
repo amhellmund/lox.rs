@@ -31,6 +31,10 @@ impl ExecutionEnvironment {
     pub fn get_variable(&self, name: &str) -> Option<ExprValue> {
         self.variables.get(name).cloned()
     }
+
+    pub fn has_variable(&self, name: &str) -> bool {
+        self.variables.contains_key(name)
+    }
 }
 
 #[cfg(test)]
@@ -52,5 +56,13 @@ mod tests {
     fn test_read_nonexistent_variable() {
         let env = ExecutionEnvironment::new();
         assert!(matches!(env.get_variable("name"), None));
+    }
+
+    #[test]
+    fn test_has_variable() {
+        let mut env = ExecutionEnvironment::new();
+        assert_eq!(env.has_variable("name"), false);
+        env.define_variable("name", ExprValue::Nil);
+        assert_eq!(env.has_variable("name"), true);
     }
 }

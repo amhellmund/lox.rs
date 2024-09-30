@@ -96,7 +96,9 @@ impl<'a, W: Write> Evaluator<'a, W> {
                 let expr_value = self.eval_expr(init_expr)?;
                 self.env.define_variable(identifier, expr_value);
             }
-            Stmt::Expr { .. } => todo!(),
+            Stmt::Expr { expr, .. } => {
+                self.eval_expr(&expr)?;
+            }
             Stmt::Print { expr, .. } => {
                 let expr_value = self.eval_expr(expr)?;
                 if let Some(writer) = &mut self.output_writer {
@@ -120,6 +122,22 @@ impl<'a, W: Write> Evaluator<'a, W> {
                 } else {
                     Err(emit_diagnostic(
                         format!("Identifier '{}' has not been defined", name),
+                        FileLocation::Span(*loc),
+                        &self.source_file,
+                    ))
+                }
+            }
+            Expr::Assign { name, expr, loc } => {
+                if self.env.has_variable(name) {
+                    let value = self.eval_expr(expr)?;
+                    self.env.define_variable(name, value.clone());
+                    Ok(value)
+                } else {
+                    Err(emit_diagnostic(
+                        format!(
+                            "Identifier '{}' cannot be assigned because it does not exist",
+                            name
+                        ),
                         FileLocation::Span(*loc),
                         &self.source_file,
                     ))
@@ -374,6 +392,14 @@ mod tests {
 
     fn new_grouping_expr(expr: Expr) -> Expr {
         Expr::Grouping {
+            expr: Box::new(expr),
+            loc: default_loc_span(),
+        }
+    }
+
+    fn new_variable_assignment(name: &str, expr: Expr) -> Expr {
+        Expr::Assign {
+            name: name.into(),
             expr: Box::new(expr),
             loc: default_loc_span(),
         }
@@ -635,6 +661,34 @@ mod tests {
         run_test_eval_with_expected_errors(test_data);
     }
 
+    #[test]
+    fn test_eval_assignment_single() {
+        let ast = new_variable_assignment("name", new_literal_expr(Literal::Number(10.0)));
+        let mut evaluator = new_test_evaluator();
+        evaluator
+            .env
+            .define_variable("name", ExprValue::Number(1.0));
+        let value = evaluator.eval_expr(&ast).unwrap();
+        assert!(matches!(value, ExprValue::Number(10.0)));
+    }
+
+    #[test]
+    fn test_eval_assignment_nested() {
+        let ast = new_variable_assignment(
+            "name",
+            new_variable_assignment("name1", new_literal_expr(Literal::Boolean(true))),
+        );
+        let mut evaluator = new_test_evaluator();
+        evaluator
+            .env
+            .define_variable("name", ExprValue::Boolean(true));
+        evaluator
+            .env
+            .define_variable("name1", ExprValue::Boolean(false));
+        let value = evaluator.eval_expr(&ast).unwrap();
+        assert!(matches!(value, ExprValue::Boolean(true)));
+    }
+
     fn run_eval_stmt_with_capture_output(stmt: &Stmt) -> String {
         let mut output_writer = std::io::Cursor::new(Vec::<u8>::new());
         eval_stmt(&stmt, "in-memory".into(), Some(&mut output_writer)).unwrap();
@@ -699,6 +753,25 @@ mod tests {
         assert_eq!(
             evaluator.env.get_variable("name_copied").unwrap(),
             ExprValue::Number(2.0)
+        );
+    }
+
+    #[test]
+    fn test_eval_expression_statement() {
+        let ast = Stmt::Expr {
+            expr: Box::new(new_variable_assignment(
+                "name",
+                new_literal_expr(Literal::String("string".into())),
+            )),
+            loc: default_loc_span(),
+        };
+        let mut evaluator = new_test_evaluator();
+        evaluator.env.define_variable("name", ExprValue::Nil);
+        evaluator.eval(&ast).unwrap();
+
+        assert_eq!(
+            evaluator.env.get_variable("name").unwrap(),
+            ExprValue::String("string".into())
         );
     }
 }

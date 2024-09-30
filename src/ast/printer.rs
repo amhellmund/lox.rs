@@ -109,6 +109,17 @@ fn print_expr(expr: &Expr, indent: i64) -> String {
                 loc.to_string()
             )
         }
+        Expr::Assign { name, expr, loc } => {
+            let expr_str = print_expr(expr, indent + INDENT_NEXT_LEVEL);
+            format!(
+                "{}= [{}]\n{}{}\n{}",
+                get_indent_as_string(indent),
+                loc.to_string(),
+                get_indent_as_string(indent + INDENT_NEXT_LEVEL),
+                name,
+                expr_str,
+            )
+        }
         Expr::Literal {
             literal: Literal::Boolean(value),
             loc,

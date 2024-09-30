@@ -67,7 +67,7 @@ impl Parser {
         }
     }
 
-    fn merge_token_locations(expr_first: &Expr, expr_second: &Expr) -> LocationSpan {
+    fn merge_expr_locations(expr_first: &Expr, expr_second: &Expr) -> LocationSpan {
         LocationSpan::new(
             expr_first.get_loc().start,
             expr_second.get_loc().end_inclusive,
@@ -253,7 +253,36 @@ impl Parser {
     ///
     ///   expression: equality
     fn parse_expression(&mut self) -> Result<Expr> {
-        Ok(self.parse_equality()?)
+        Ok(self.parse_assignment()?)
+    }
+
+    /// Parses an assignment expression.
+    ///
+    /// Grammer rule:
+    ///   assignment: 'identifier' '=' assignment
+    ///             | equality
+    fn parse_assignment(&mut self) -> Result<Expr> {
+        let lvalue_expr = self.parse_equality()?;
+        if let Some(_) = self.consume_if_has_token_type(&[TokenType::Equal]) {
+            let rvalue_expr = self.parse_assignment()?;
+
+            if let Expr::Variable { name, .. } = &lvalue_expr {
+                let loc = Self::merge_expr_locations(&lvalue_expr, &rvalue_expr);
+                Ok(Expr::Assign {
+                    name: name.clone(),
+                    expr: Box::new(rvalue_expr),
+                    loc: loc,
+                })
+            } else {
+                Err(emit_diagnostic(
+                    format!("Invalid lvalue for assignment"),
+                    FileLocation::Span(*lvalue_expr.get_loc()),
+                    &self.source_file,
+                ))
+            }
+        } else {
+            Ok(lvalue_expr)
+        }
     }
 
     /// Parses generic binary expressions.
@@ -277,7 +306,7 @@ impl Parser {
             let rhs = parse_fn(self)?;
 
             // The locations must get merged before the rhs expression gets moved into the new binary expression.
-            let loc = Self::merge_token_locations(&expr, &rhs);
+            let loc = Self::merge_expr_locations(&expr, &rhs);
             expr = Expr::Binary {
                 lhs: Box::new(expr),
                 op,
@@ -452,7 +481,13 @@ mod tests {
         let mut loc = Location::new(1, 1);
         let mut tokens = Vec::<Token>::new();
         for token_type in token_types {
-            tokens.push(Token::new(token_type, loc, token_type.to_string()));
+            let lexeme = match token_type {
+                TokenType::Number => String::from("0.0"),
+                TokenType::Identifier => String::from("identifier"),
+                TokenType::StringLiteral => String::from("string-literal"),
+                _ => token_type.to_string(),
+            };
+            tokens.push(Token::new(token_type, loc, lexeme));
             loc.line += 1;
         }
         tokens.push(Token::new(TokenType::EndOfFile, loc, String::default()));
@@ -680,6 +715,37 @@ mod tests {
             let ast: Expr = parse_expr(tokens).unwrap();
             assert_eq!(ast, expected_ast);
         }
+    }
+
+    #[test]
+    fn test_assignment() {
+        let tokens = build_token_sequence(vec![
+            TokenType::Identifier,
+            TokenType::Equal,
+            TokenType::StringLiteral,
+        ]);
+        let expected_ast = Expr::Assign {
+            name: String::from("identifier"),
+            expr: Box::new(Expr::Literal {
+                literal: Literal::String("string-literal".into()),
+                loc: loc_span((3, 1), (3, 14)),
+            }),
+            loc: loc_span((1, 1), (3, 14)),
+        };
+        let ast = parse_expr(tokens).unwrap();
+        assert_eq!(ast, expected_ast);
+    }
+
+    #[test]
+    fn test_assignment_error() {
+        let tokens = build_token_sequence(vec![
+            TokenType::Identifier,
+            TokenType::Plus,
+            TokenType::Number,
+            TokenType::Equal,
+            TokenType::StringLiteral,
+        ]);
+        assert!(parse_expr(tokens).is_err());
     }
 
     #[test]

@@ -105,6 +105,11 @@ pub enum Expr {
         name: String,
         loc: LocationSpan,
     },
+    Assign {
+        name: String,
+        expr: Box<Expr>,
+        loc: LocationSpan,
+    },
 }
 
 impl Expr {
@@ -115,6 +120,7 @@ impl Expr {
             Expr::Grouping { loc, .. } => loc,
             Expr::Literal { loc, .. } => loc,
             Expr::Variable { loc, .. } => loc,
+            Expr::Assign { loc, .. } => loc,
         }
     }
 }
