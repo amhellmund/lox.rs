@@ -121,7 +121,7 @@ impl<'a, W: Write> Evaluator<'a, W> {
                     Ok(value.clone())
                 } else {
                     Err(emit_diagnostic(
-                        format!("Identifier '{}' has not been defined", name),
+                        format!("Undefined variable '{}'", name),
                         FileLocation::Span(*loc),
                         &self.source_file,
                     ))
@@ -134,10 +134,7 @@ impl<'a, W: Write> Evaluator<'a, W> {
                     Ok(value)
                 } else {
                     Err(emit_diagnostic(
-                        format!(
-                            "Identifier '{}' cannot be assigned because it does not exist",
-                            name
-                        ),
+                        format!("Undefined variable '{}'", name),
                         FileLocation::Span(*loc),
                         &self.source_file,
                     ))
