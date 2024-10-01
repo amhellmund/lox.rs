@@ -128,6 +128,7 @@ impl Expr {
 #[derive(PartialEq, Debug)]
 pub enum Stmt {
     List(Vec<Stmt>),
+    Block(Vec<Stmt>),
     VarDecl {
         identifier: String,
         init_expr: Box<Expr>,

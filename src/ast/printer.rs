@@ -24,15 +24,18 @@ fn get_indent_as_string(indent: i64) -> String {
         .collect::<String>()
 }
 
+fn stringify_statements(statements: &Vec<Stmt>, ast_tag: &str, indent: i64) -> String {
+    let mut statement_string = format!("{}[{}]\n", get_indent_as_string(indent), ast_tag);
+    for statement in statements {
+        statement_string += &print_stmt(statement, indent + INDENT_NEXT_LEVEL);
+    }
+    statement_string
+}
+
 fn print_stmt(stmt: &Stmt, indent: i64) -> String {
     match stmt {
-        Stmt::List(statements) => {
-            let mut statement_string = format!("{}[Stmts]\n", get_indent_as_string(indent));
-            for statement in statements {
-                statement_string += &print_stmt(statement, indent + INDENT_NEXT_LEVEL);
-            }
-            statement_string
-        }
+        Stmt::List(statements) => stringify_statements(statements, "Stmt", indent),
+        Stmt::Block(statements) => stringify_statements(statements, "Block", indent),
         Stmt::VarDecl {
             identifier,
             init_expr,

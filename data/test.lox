@@ -1,4 +1,11 @@
 var a = 12.0;
 var b = 24.0;
-print (a + b + 1);
-a = (b = 1.0);
+
+{
+    var a = "ab";
+    print a;
+    print b;
+}
+
+print a;
+print b;

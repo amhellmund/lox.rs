@@ -83,10 +83,14 @@ impl<'a, W: Write> Evaluator<'a, W> {
 
     pub fn eval(&mut self, stmt: &Stmt) -> Result<()> {
         match stmt {
-            Stmt::List(statements) => {
-                for stmt in statements {
-                    self.eval(stmt)?
-                }
+            Stmt::List(statements) => self.eval_stmts(statements)?,
+            Stmt::Block(statements) => {
+                // Errors when executing statements shall not be propagated as is, because
+                // the scope must get cleaned up properly at the end of the block.
+                self.env.create_scope();
+                let result = self.eval_stmts(statements);
+                self.env.drop_innermost_scope();
+                return result;
             }
             Stmt::VarDecl {
                 identifier,
@@ -105,6 +109,13 @@ impl<'a, W: Write> Evaluator<'a, W> {
                     writer.write_fmt(format_args!("{}\n", expr_value.to_string()))?;
                 }
             }
+        }
+        Ok(())
+    }
+
+    fn eval_stmts(&mut self, statements: &Vec<Stmt>) -> Result<()> {
+        for stmt in statements {
+            self.eval(stmt)?
         }
         Ok(())
     }

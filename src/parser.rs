@@ -204,11 +204,12 @@ impl Parser {
     ///
     ///   statement: print_statement
     ///            | expression_statement
+    ///            | block statement
     fn parse_statement(&mut self) -> Result<Stmt> {
-        if self.tokens.current_has_token_type(&[TokenType::Print]) {
-            self.parse_print_statement()
-        } else {
-            self.parse_expression_statement()
+        match self.tokens.current().token_type {
+            TokenType::Print => self.parse_print_statement(),
+            TokenType::LeftBrace => self.parse_block_statement(),
+            _ => self.parse_expression_statement(),
         }
     }
 
@@ -245,6 +246,33 @@ impl Parser {
             expr: Box::new(expr),
             loc: LocationSpan::new(start_loc, semicolon_token.location),
         })
+    }
+
+    /// Parses a block statement.
+    ///
+    /// Grammar rule:
+    ///
+    ///   block_statement: '{' statement* '}'
+    ///
+    /// This function assumes that the LeftBrace token has not yet been consumed.
+    fn parse_block_statement(&mut self) -> Result<Stmt> {
+        let statements = self.parse_block()?;
+        Ok(Stmt::Block(statements))
+    }
+
+    /// Helper function to parse a block with statements.
+    ///
+    /// This function assumes that the `LeftBrace` token has not yet been consumed.
+    fn parse_block(&mut self) -> Result<Vec<Stmt>> {
+        self.consume_or_error(TokenType::LeftBrace)?;
+        let mut statements = Vec::<Stmt>::new();
+        while !self.tokens.current_has_token_type(&[TokenType::RightBrace])
+            && !self.tokens.has_reached_end()
+        {
+            statements.push(self.parse_declaration()?);
+        }
+        self.consume_or_error(TokenType::RightBrace)?;
+        Ok(statements)
     }
 
     /// Parses an expression (lowest precedence -> highest in AST (sub)hierarchy).
@@ -843,6 +871,49 @@ mod tests {
             }),
             loc: loc_span((1, 1), (2, 1)),
         };
+        let ast = parse_stmt(tokens).unwrap();
+        assert_eq!(ast, expected_ast);
+    }
+
+    #[test]
+    fn test_block_statement() {
+        let tokens = build_token_sequence(vec![
+            TokenType::LeftBrace,
+            TokenType::Print,
+            TokenType::Number,
+            TokenType::Semicolon,
+            TokenType::RightBrace,
+        ]);
+        let expected_ast = Stmt::Block(vec![Stmt::Print {
+            expr: Box::new(Expr::Literal {
+                literal: Literal::Number(0.0),
+                loc: loc_span((3, 1), (3, 3)),
+            }),
+            loc: loc_span((2, 1), (4, 1)),
+        }]);
+        let ast = parse_stmt(tokens).unwrap();
+        assert_eq!(ast, expected_ast);
+    }
+
+    #[test]
+    fn test_block_statement_with_inner_variable_declaration() {
+        let tokens = build_token_sequence(vec![
+            TokenType::LeftBrace,
+            TokenType::Var,
+            TokenType::Identifier,
+            TokenType::Equal,
+            TokenType::Number,
+            TokenType::Semicolon,
+            TokenType::RightBrace,
+        ]);
+        let expected_ast = Stmt::Block(vec![Stmt::VarDecl {
+            identifier: String::from("identifier"),
+            init_expr: Box::new(Expr::Literal {
+                literal: Literal::Number(0.0),
+                loc: loc_span((5, 1), (5, 3)),
+            }),
+            loc: loc_span((2, 1), (6, 1)),
+        }]);
         let ast = parse_stmt(tokens).unwrap();
         assert_eq!(ast, expected_ast);
     }
