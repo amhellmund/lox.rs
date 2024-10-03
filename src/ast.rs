@@ -28,7 +28,7 @@ use crate::diagnostics::LocationSpan;
 
 /// Statements.
 #[derive(PartialEq, Debug)]
-struct Stmt {
+pub struct Stmt {
     data: StmtData,
     loc: LocationSpan,
 }
@@ -38,8 +38,8 @@ impl Stmt {
         Self { data, loc }
     }
 
-    pub fn new_as_box(data: StmtData, loc: LocationSpan) -> Box<Self> {
-        Box::new(Self::new(data, loc))
+    pub fn as_box(self) -> Box<Self> {
+        Box::new(self)
     }
 
     pub fn get_data(&self) -> &StmtData {
@@ -147,8 +147,15 @@ impl Expr {
         Self { data, loc }
     }
 
-    pub fn new_as_box(data: ExprData, loc: LocationSpan) -> Box<Self> {
-        Box::new(Self::new(data, loc))
+    pub fn as_box(self) -> Box<Self> {
+        Box::new(self)
+    }
+
+    pub fn new_literal(literal: Literal, loc: LocationSpan) -> Self {
+        Self {
+            data: ExprData::Literal { literal },
+            loc,
+        }
     }
 
     pub fn get_data(&self) -> &ExprData {
@@ -186,60 +193,87 @@ pub enum ExprData {
     },
 }
 
+/// Test utilities when working with the Abstract Syntax Tree.
 #[cfg(test)]
 pub mod tests {
+    use crate::diagnostics::{Location, LocationSpan};
+
+    use super::{BinaryOperator, Expr, ExprData, Literal, Stmt, UnaryOperator};
+
+    /// Compares two statements for equality without into account the 'data' field only.
+    ///
+    /// This function may be used when the location information is irrelevant for a test case.
+    pub fn compare_stmt_equal_data(lhs: &Stmt, rhs: &Stmt) -> bool {
+        lhs.data == rhs.data
+    }
+
+    /// Compares two expressions for eqaulity taking into account the data only.
+    ///
+    /// This function may be used when the location information is irrelevant for a test case.
+    pub fn compare_expr_equal_data(lhs: &Expr, rhs: &Expr) -> bool {
+        lhs.data == rhs.data
+    }
+
+    /// Creates a default location span for testing purpose.
+    pub fn default_loc_span() -> LocationSpan {
+        LocationSpan {
+            start: Location::new(1, 1),
+            end_inclusive: Location::new(1, 1),
+        }
+    }
+
+    /// Creates a new expression by setting the location to a default value.
+    fn new_expr(expr_data: ExprData) -> Expr {
+        Expr {
+            data: expr_data,
+            loc: default_loc_span(),
+        }
+    }
+
+    /// Creates a new literal expression from a scalar literal value.
     fn new_literal_expr(literal: Literal) -> Expr {
-        Expr::Literal {
-            literal: literal,
-            loc: default_loc_span(),
-        }
+        new_expr(ExprData::Literal { literal })
     }
 
+    /// Creates a new number literal from any type convertible to the target type.
+    fn new_number_literal<T: Into<f64>>(value: T) -> Expr {
+        new_literal_expr(Literal::Number(value.into()))
+    }
+
+    /// Creates a new string literal.
+    fn new_string_literal(value: &str) -> Expr {
+        new_literal_expr(Literal::String(String::from(value)))
+    }
+
+    /// Creates a new binary expression.
     fn new_binary_expr(op: BinaryOperator, lhs: Expr, rhs: Expr) -> Expr {
-        Expr::Binary {
-            lhs: Box::new(lhs),
+        new_expr(ExprData::Binary {
+            lhs: lhs.as_box(),
             op,
-            rhs: Box::new(rhs),
-            loc: default_loc_span(),
-        }
+            rhs: rhs.as_box(),
+        })
     }
 
-    fn new_binary_expr_number(op: BinaryOperator, lhs: f64, rhs: f64) -> Expr {
-        new_binary_expr(
-            op,
-            new_literal_expr(Literal::Number(lhs)),
-            new_literal_expr(Literal::Number(rhs)),
-        )
-    }
-
-    fn new_binary_expr_str(op: BinaryOperator, lhs: &str, rhs: &str) -> Expr {
-        new_binary_expr(
-            op,
-            new_literal_expr(Literal::String(lhs.to_string())),
-            new_literal_expr(Literal::String(rhs.to_string())),
-        )
-    }
-
+    /// Creates a new unary expression.
     fn new_unary_expr(op: UnaryOperator, expr: Expr) -> Expr {
-        Expr::Unary {
+        new_expr(ExprData::Unary {
             op,
-            expr: Box::new(expr),
-            loc: default_loc_span(),
-        }
+            expr: expr.as_box(),
+        })
     }
 
+    /// Creating a grouping expression.
     fn new_grouping_expr(expr: Expr) -> Expr {
-        Expr::Grouping {
-            expr: Box::new(expr),
-            loc: default_loc_span(),
-        }
+        new_expr(ExprData::Grouping {
+            expr: expr.as_box(),
+        })
     }
 
+    /// Create a new variable expression.
     fn new_variable_assignment(name: &str, expr: Expr) -> Expr {
-        Expr::Assign {
-            name: name.into(),
-            expr: Box::new(expr),
-            loc: default_loc_span(),
-        }
+        new_expr(ExprData::Assign {
+            name: String::from(name),
+            expr: expr.as_box(),
+        })
     }
 }

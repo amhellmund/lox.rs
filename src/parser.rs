@@ -16,7 +16,7 @@ mod token_sequence;
 
 use std::path::PathBuf;
 
-use crate::ast::{BinaryOperator, Expr, Literal, Stmt, UnaryOperator};
+use crate::ast::{BinaryOperator, Expr, Literal, Stmt, StmtData, UnaryOperator};
 use crate::diagnostics::{emit_diagnostic, FileLocation, Location, LocationSpan};
 use crate::scanner::{Token, TokenType};
 use anyhow::Result;
@@ -155,10 +155,12 @@ impl Parser {
             declarations.push(self.parse_declaration()?);
         }
         let loc = Self::create_location_span_from_stmts(&declarations);
-        Ok(Stmt::List {
-            statements: declarations,
+        Ok(Stmt::new(
+            StmtData::List {
+                statements: declarations,
+            },
             loc,
-        })
+        ))
     }
 
     /// Parses a declaration.
@@ -188,22 +190,24 @@ impl Parser {
 
         let init_expr;
         if let Some(_) = self.consume_if_has_token_type(&[TokenType::Equal]) {
-            init_expr = Box::new(self.parse_expression()?);
+            init_expr = self.parse_expression()?;
         } else {
             // The init expression is set to 'nil' in case there is no initializer.
-            init_expr = Box::new(Expr::Literal {
-                literal: Literal::Nil,
-                loc: Self::create_location_span_from_token(&identifier),
-            });
+            init_expr = Expr::new_literal(
+                Literal::Nil,
+                Self::create_location_span_from_token(&identifier),
+            );
         }
 
         let semicolon_token = self.consume_or_error(TokenType::Semicolon)?;
 
-        Ok(Stmt::VarDecl {
-            identifier: identifier.lexeme,
-            init_expr,
-            loc: LocationSpan::new(var_token.location, semicolon_token.location),
-        })
+        Ok(Stmt::new(
+            StmtData::VarDecl {
+                identifier: identifier.lexeme,
+                init_expr: init_expr.as_box(),
+            },
+            LocationSpan::new(var_token.location, semicolon_token.location),
+        ))
     }
 
     /// Parses a statement.
