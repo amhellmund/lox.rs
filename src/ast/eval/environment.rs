@@ -86,11 +86,29 @@ impl ExecutionEnvironment {
         }
     }
 
+    /// Defines a new variable within the inner-most scope.
     pub fn define_variable(&mut self, name: &str, value: ExprValue) {
         let scope = self.scopes.last_mut().unwrap();
         scope.define_variable(name.into(), value);
     }
 
+    /// Assigns a value to an existing variable.
+    ///
+    /// Returns true if the value could get assigned, or false if the variable does
+    /// not exist in any scope.
+    pub fn assign_variable(&mut self, name: &str, value: ExprValue) -> bool {
+        for i in (0..self.scopes.len()).rev() {
+            if self.scopes[i].has_variable(name) {
+                self.scopes[i].define_variable(name, value);
+                return true;
+            }
+        }
+        false
+    }
+
+    /// Returns the variable value from any scope along the lexical scope chain.
+    ///
+    /// Returns None if the variable cannot be found in any scope.
     pub fn get_variable(&self, name: &str) -> Option<ExprValue> {
         for i in (0..self.scopes.len()).rev() {
             let scope_variable = self.scopes[i].get_variable(name);
@@ -99,15 +117,6 @@ impl ExecutionEnvironment {
             }
         }
         None
-    }
-
-    pub fn has_variable(&self, name: &str) -> bool {
-        for i in (0..self.scopes.len()).rev() {
-            if self.scopes[i].has_variable(name) {
-                return true;
-            }
-        }
-        false
     }
 }
 
@@ -133,11 +142,16 @@ mod tests {
     }
 
     #[test]
-    fn test_has_variable() {
+    fn test_assign_variable() {
         let mut env = ExecutionEnvironment::new();
-        assert_eq!(env.has_variable("name"), false);
-        env.define_variable("name", ExprValue::Nil);
-        assert_eq!(env.has_variable("name"), true);
+        env.define_variable("name", ExprValue::Number(1.0));
+        let _1 = env.create_scope();
+        let _2 = env.create_scope();
+        env.assign_variable("name", ExprValue::Number(2.0));
+        env.drop_innermost_scope();
+        env.drop_innermost_scope();
+
+        assert_eq!(env.get_variable("name").unwrap(), ExprValue::Number(2.0));
     }
 
     #[test]
@@ -155,15 +169,5 @@ mod tests {
 
         let outer_value = env.get_variable("name").unwrap();
         assert_eq!(outer_value, ExprValue::Number(1.0));
-    }
-
-    #[test]
-    fn test_has_variable_in_outer_scope_only() {
-        let mut env = ExecutionEnvironment::new();
-        env.define_variable("name", ExprValue::Number(1.0));
-        let _1 = env.create_scope();
-        let _2 = env.create_scope();
-
-        assert!(env.has_variable("name"));
     }
 }

@@ -67,11 +67,15 @@ impl Parser {
         }
     }
 
-    fn merge_expr_locations(expr_first: &Expr, expr_second: &Expr) -> LocationSpan {
-        LocationSpan::new(
-            expr_first.get_loc().start,
-            expr_second.get_loc().end_inclusive,
-        )
+    fn create_location_span_from_stmts(statements: &Vec<Stmt>) -> LocationSpan {
+        if statements.len() == 0 {
+            LocationSpan::new(Location::new(0, 0), Location::new(0, 0))
+        } else {
+            LocationSpan::new(
+                statements.first().unwrap().get_loc().start,
+                statements.last().unwrap().get_loc().end_inclusive,
+            )
+        }
     }
 
     fn create_location_span_from_token(token: &Token) -> LocationSpan {
@@ -150,7 +154,11 @@ impl Parser {
         while !self.tokens.has_reached_end() {
             declarations.push(self.parse_declaration()?);
         }
-        Ok(Stmt::List(declarations))
+        let loc = Self::create_location_span_from_stmts(&declarations);
+        Ok(Stmt::List {
+            statements: declarations,
+            loc,
+        })
     }
 
     /// Parses a declaration.
@@ -204,11 +212,15 @@ impl Parser {
     ///
     ///   statement: print_statement
     ///            | expression_statement
-    ///            | block statement
+    ///            | block_statement
+    ///            | if_statement
+    ///            | while_statement
     fn parse_statement(&mut self) -> Result<Stmt> {
         match self.tokens.current().token_type {
             TokenType::Print => self.parse_print_statement(),
             TokenType::LeftBrace => self.parse_block_statement(),
+            TokenType::If => self.parse_if_statement(),
+            TokenType::While => self.parse_while_statement(),
             _ => self.parse_expression_statement(),
         }
     }
@@ -254,25 +266,80 @@ impl Parser {
     ///
     ///   block_statement: '{' statement* '}'
     ///
-    /// This function assumes that the LeftBrace token has not yet been consumed.
+    /// This function assumes that the '{' token has not yet been consumed.
     fn parse_block_statement(&mut self) -> Result<Stmt> {
-        let statements = self.parse_block()?;
-        Ok(Stmt::Block(statements))
+        let (statements, loc) = self.parse_block()?;
+        Ok(Stmt::Block { statements, loc })
     }
 
     /// Helper function to parse a block with statements.
     ///
-    /// This function assumes that the `LeftBrace` token has not yet been consumed.
-    fn parse_block(&mut self) -> Result<Vec<Stmt>> {
-        self.consume_or_error(TokenType::LeftBrace)?;
+    /// This function assumes that the `{` token has not yet been consumed.
+    fn parse_block(&mut self) -> Result<(Vec<Stmt>, LocationSpan)> {
+        let left_brace = self.consume_or_error(TokenType::LeftBrace)?;
         let mut statements = Vec::<Stmt>::new();
         while !self.tokens.current_has_token_type(&[TokenType::RightBrace])
             && !self.tokens.has_reached_end()
         {
             statements.push(self.parse_declaration()?);
         }
-        self.consume_or_error(TokenType::RightBrace)?;
-        Ok(statements)
+        let right_brace = self.consume_or_error(TokenType::RightBrace)?;
+
+        Ok((
+            statements,
+            LocationSpan::new(left_brace.location, right_brace.location),
+        ))
+    }
+
+    /// Parses an If statement.
+    ///
+    /// Grammar rule:
+    ///
+    ///   if_statement: 'if' '(' expression ')' statement ( 'else' statement )?
+    ///
+    /// This function assumes that the 'if' token has not yet been consumed.
+    fn parse_if_statement(&mut self) -> Result<Stmt> {
+        let if_token = self.consume_or_error(TokenType::If)?;
+        self.consume_or_error(TokenType::LeftParanthesis)?;
+        let condition = Box::new(self.parse_expression()?);
+        self.consume_or_error(TokenType::RightParanthesis)?;
+        let if_statement = Box::new(self.parse_statement()?);
+
+        let mut else_statement: Option<Box<Stmt>> = None;
+        let mut loc = LocationSpan::new(if_token.location, if_statement.get_loc().end_inclusive);
+        if self.consume_if_has_token_type(&[TokenType::Else]).is_some() {
+            else_statement = Some(Box::new(self.parse_statement()?));
+            loc.end_inclusive = else_statement.as_ref().unwrap().get_loc().end_inclusive;
+        }
+
+        Ok(Stmt::If {
+            condition,
+            if_statement,
+            else_statement,
+            loc,
+        })
+    }
+
+    /// Parses a While statement.
+    ///
+    /// Grammar rule:
+    ///
+    ///   while_statement: 'while '(' expression ')' statement
+    ///
+    /// This function assumes that the 'while' token has not yet been consumed.s
+    fn parse_while_statement(&mut self) -> Result<Stmt> {
+        let while_token = self.consume_or_error(TokenType::While)?;
+        self.consume_or_error(TokenType::LeftParanthesis)?;
+        let condition = Box::new(self.parse_expression()?);
+        self.consume_or_error(TokenType::RightParanthesis)?;
+        let body = Box::new(self.parse_statement()?);
+
+        let loc = LocationSpan::new(while_token.location, body.get_loc().end_inclusive);
+        Ok(Stmt::While {
+            condition,
+            body,
+            loc,
+        })
     }
 
     /// Parses an expression (lowest precedence -> highest in AST (sub)hierarchy).
@@ -295,7 +362,10 @@ impl Parser {
             let rvalue_expr = self.parse_assignment()?;
 
             if let Expr::Variable { name, .. } = &lvalue_expr {
-                let loc = Self::merge_expr_locations(&lvalue_expr, &rvalue_expr);
+                let loc = LocationSpan::new(
+                    lvalue_expr.get_loc().start,
+                    rvalue_expr.get_loc().end_inclusive,
+                );
                 Ok(Expr::Assign {
                     name: name.clone(),
                     expr: Box::new(rvalue_expr),
@@ -334,7 +404,7 @@ impl Parser {
             let rhs = parse_fn(self)?;
 
             // The locations must get merged before the rhs expression gets moved into the new binary expression.
-            let loc = Self::merge_expr_locations(&expr, &rhs);
+            let loc = LocationSpan::new(expr.get_loc().start, rhs.get_loc().end_inclusive);
             expr = Expr::Binary {
                 lhs: Box::new(expr),
                 op,
@@ -884,13 +954,16 @@ mod tests {
             TokenType::Semicolon,
             TokenType::RightBrace,
         ]);
-        let expected_ast = Stmt::Block(vec![Stmt::Print {
-            expr: Box::new(Expr::Literal {
-                literal: Literal::Number(0.0),
-                loc: loc_span((3, 1), (3, 3)),
-            }),
-            loc: loc_span((2, 1), (4, 1)),
-        }]);
+        let expected_ast = Stmt::Block {
+            statements: vec![Stmt::Print {
+                expr: Box::new(Expr::Literal {
+                    literal: Literal::Number(0.0),
+                    loc: loc_span((3, 1), (3, 3)),
+                }),
+                loc: loc_span((2, 1), (4, 1)),
+            }],
+            loc: loc_span((1, 1), (5, 1)),
+        };
         let ast = parse_stmt(tokens).unwrap();
         assert_eq!(ast, expected_ast);
     }
@@ -906,14 +979,136 @@ mod tests {
             TokenType::Semicolon,
             TokenType::RightBrace,
         ]);
-        let expected_ast = Stmt::Block(vec![Stmt::VarDecl {
-            identifier: String::from("identifier"),
-            init_expr: Box::new(Expr::Literal {
+        let expected_ast = Stmt::Block {
+            statements: vec![Stmt::VarDecl {
+                identifier: String::from("identifier"),
+                init_expr: Box::new(Expr::Literal {
+                    literal: Literal::Number(0.0),
+                    loc: loc_span((5, 1), (5, 3)),
+                }),
+                loc: loc_span((2, 1), (6, 1)),
+            }],
+            loc: loc_span((1, 1), (7, 1)),
+        };
+        let ast = parse_stmt(tokens).unwrap();
+        assert_eq!(ast, expected_ast);
+    }
+
+    #[test]
+    fn test_if_statement_with_if_only() {
+        let tokens = build_token_sequence(vec![
+            TokenType::If,
+            TokenType::LeftParanthesis,
+            TokenType::Number,
+            TokenType::RightParanthesis,
+            TokenType::Identifier,
+            TokenType::Equal,
+            TokenType::Number,
+            TokenType::Semicolon,
+        ]);
+        let expected_ast = Stmt::If {
+            condition: Box::new(Expr::Literal {
                 literal: Literal::Number(0.0),
-                loc: loc_span((5, 1), (5, 3)),
+                loc: loc_span((3, 1), (3, 3)),
             }),
-            loc: loc_span((2, 1), (6, 1)),
-        }]);
+            if_statement: Box::new(Stmt::Expr {
+                expr: Box::new(Expr::Assign {
+                    name: "identifier".into(),
+                    expr: Box::new(Expr::Literal {
+                        literal: Literal::Number(0.0),
+                        loc: loc_span((7, 1), (7, 3)),
+                    }),
+                    loc: loc_span((5, 1), (7, 3)),
+                }),
+                loc: loc_span((5, 1), (8, 1)),
+            }),
+            else_statement: None,
+            loc: loc_span((1, 1), (8, 1)),
+        };
+        let ast = parse_stmt(tokens).unwrap();
+        assert_eq!(ast, expected_ast);
+    }
+
+    #[test]
+    fn test_if_statement_with_if_and_else() {
+        let tokens = build_token_sequence(vec![
+            TokenType::If,
+            TokenType::LeftParanthesis,
+            TokenType::Number,
+            TokenType::RightParanthesis,
+            TokenType::Identifier,
+            TokenType::Equal,
+            TokenType::Number,
+            TokenType::Semicolon,
+            TokenType::Else,
+            TokenType::Identifier,
+            TokenType::Equal,
+            TokenType::Nil,
+            TokenType::Semicolon,
+        ]);
+        let expected_ast = Stmt::If {
+            condition: Box::new(Expr::Literal {
+                literal: Literal::Number(0.0),
+                loc: loc_span((3, 1), (3, 3)),
+            }),
+            if_statement: Box::new(Stmt::Expr {
+                expr: Box::new(Expr::Assign {
+                    name: "identifier".into(),
+                    expr: Box::new(Expr::Literal {
+                        literal: Literal::Number(0.0),
+                        loc: loc_span((7, 1), (7, 3)),
+                    }),
+                    loc: loc_span((5, 1), (7, 3)),
+                }),
+                loc: loc_span((5, 1), (8, 1)),
+            }),
+            else_statement: Some(Box::new(Stmt::Expr {
+                expr: Box::new(Expr::Assign {
+                    name: "identifier".into(),
+                    expr: Box::new(Expr::Literal {
+                        literal: Literal::Nil,
+                        loc: loc_span((12, 1), (12, 3)),
+                    }),
+                    loc: loc_span((10, 1), (12, 3)),
+                }),
+                loc: loc_span((10, 1), (13, 1)),
+            })),
+            loc: loc_span((1, 1), (13, 1)),
+        };
+        let ast = parse_stmt(tokens).unwrap();
+        assert_eq!(ast, expected_ast);
+    }
+
+    #[test]
+    fn test_while_statment() {
+        let tokens = build_token_sequence(vec![
+            TokenType::While,
+            TokenType::LeftParanthesis,
+            TokenType::Number,
+            TokenType::RightParanthesis,
+            TokenType::Identifier,
+            TokenType::Equal,
+            TokenType::Number,
+            TokenType::Semicolon,
+        ]);
+        let expected_ast = Stmt::While {
+            condition: Box::new(Expr::Literal {
+                literal: Literal::Number(0.0),
+                loc: loc_span((3, 1), (3, 3)),
+            }),
+            body: Box::new(Stmt::Expr {
+                expr: Box::new(Expr::Assign {
+                    name: "identifier".into(),
+                    expr: Box::new(Expr::Literal {
+                        literal: Literal::Number(0.0),
+                        loc: loc_span((7, 1), (7, 3)),
+                    }),
+                    loc: loc_span((5, 1), (7, 3)),
+                }),
+                loc: loc_span((5, 1), (8, 1)),
+            }),
+            loc: loc_span((1, 1), (8, 1)),
+        };
         let ast = parse_stmt(tokens).unwrap();
         assert_eq!(ast, expected_ast);
     }

@@ -7,7 +7,10 @@
 //!
 //! Prints the structure of the AST hierarchically on the command line.
 
-use crate::ast::{Expr, Literal};
+use crate::{
+    ast::{Expr, Literal},
+    diagnostics::LocationSpan,
+};
 
 use super::Stmt;
 
@@ -24,8 +27,18 @@ fn get_indent_as_string(indent: i64) -> String {
         .collect::<String>()
 }
 
-fn stringify_statements(statements: &Vec<Stmt>, ast_tag: &str, indent: i64) -> String {
-    let mut statement_string = format!("{}[{}]\n", get_indent_as_string(indent), ast_tag);
+fn stringify_statements(
+    statements: &Vec<Stmt>,
+    ast_tag: &str,
+    loc: &LocationSpan,
+    indent: i64,
+) -> String {
+    let mut statement_string = format!(
+        "{}[{}] [{}]\n",
+        get_indent_as_string(indent),
+        ast_tag,
+        loc.to_string()
+    );
     for statement in statements {
         statement_string += &print_stmt(statement, indent + INDENT_NEXT_LEVEL);
     }
@@ -34,8 +47,8 @@ fn stringify_statements(statements: &Vec<Stmt>, ast_tag: &str, indent: i64) -> S
 
 fn print_stmt(stmt: &Stmt, indent: i64) -> String {
     match stmt {
-        Stmt::List(statements) => stringify_statements(statements, "Stmt", indent),
-        Stmt::Block(statements) => stringify_statements(statements, "Block", indent),
+        Stmt::List { statements, loc } => stringify_statements(statements, "List", loc, indent),
+        Stmt::Block { statements, loc } => stringify_statements(statements, "Block", loc, indent),
         Stmt::VarDecl {
             identifier,
             init_expr,
@@ -64,6 +77,44 @@ fn print_stmt(stmt: &Stmt, indent: i64) -> String {
                 get_indent_as_string(indent),
                 loc.to_string(),
                 print_expr(expr, indent + INDENT_NEXT_LEVEL),
+            )
+        }
+        Stmt::If {
+            condition,
+            if_statement,
+            else_statement,
+            loc,
+        } => {
+            if else_statement.is_some() {
+                format!(
+                    "{}[If] [{}]\n{}\n{}\n{}",
+                    get_indent_as_string(indent),
+                    loc.to_string(),
+                    print_expr(condition, indent + INDENT_NEXT_LEVEL),
+                    print_stmt(if_statement, indent + INDENT_NEXT_LEVEL),
+                    print_stmt(else_statement.as_ref().unwrap(), indent + INDENT_NEXT_LEVEL),
+                )
+            } else {
+                format!(
+                    "{}[If] [{}]\n{}\n{}",
+                    get_indent_as_string(indent),
+                    loc.to_string(),
+                    print_expr(condition, indent + INDENT_NEXT_LEVEL),
+                    print_stmt(if_statement, indent + INDENT_NEXT_LEVEL),
+                )
+            }
+        }
+        Stmt::While {
+            condition,
+            body,
+            loc,
+        } => {
+            format!(
+                "{}[While] [{}]\n{}\n{}",
+                get_indent_as_string(indent),
+                loc.to_string(),
+                print_expr(&condition, indent + INDENT_NEXT_LEVEL),
+                print_stmt(&body, indent + INDENT_NEXT_LEVEL),
             )
         }
     }

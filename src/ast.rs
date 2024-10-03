@@ -127,8 +127,14 @@ impl Expr {
 
 #[derive(PartialEq, Debug)]
 pub enum Stmt {
-    List(Vec<Stmt>),
-    Block(Vec<Stmt>),
+    List {
+        statements: Vec<Stmt>,
+        loc: LocationSpan,
+    },
+    Block {
+        statements: Vec<Stmt>,
+        loc: LocationSpan,
+    },
     VarDecl {
         identifier: String,
         init_expr: Box<Expr>,
@@ -142,4 +148,29 @@ pub enum Stmt {
         expr: Box<Expr>,
         loc: LocationSpan,
     },
+    If {
+        condition: Box<Expr>,
+        if_statement: Box<Stmt>,
+        else_statement: Option<Box<Stmt>>,
+        loc: LocationSpan,
+    },
+    While {
+        condition: Box<Expr>,
+        body: Box<Stmt>,
+        loc: LocationSpan,
+    },
+}
+
+impl Stmt {
+    pub fn get_loc(&self) -> &LocationSpan {
+        match self {
+            Stmt::Block { loc, .. } => loc,
+            Stmt::Expr { loc, .. } => loc,
+            Stmt::If { loc, .. } => loc,
+            Stmt::List { loc, .. } => loc,
+            Stmt::Print { loc, .. } => loc,
+            Stmt::VarDecl { loc, .. } => loc,
+            Stmt::While { loc, .. } => loc,
+        }
+    }
 }

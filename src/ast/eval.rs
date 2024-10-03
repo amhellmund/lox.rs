@@ -81,10 +81,18 @@ impl<'a, W: Write> Evaluator<'a, W> {
         }
     }
 
+    fn is_truthy(expr_value: &ExprValue) -> bool {
+        match expr_value {
+            ExprValue::Boolean(false) => false,
+            ExprValue::Nil => false,
+            _ => true,
+        }
+    }
+
     pub fn eval(&mut self, stmt: &Stmt) -> Result<()> {
         match stmt {
-            Stmt::List(statements) => self.eval_stmts(statements)?,
-            Stmt::Block(statements) => {
+            Stmt::List { statements, .. } => self.eval_stmts(statements)?,
+            Stmt::Block { statements, .. } => {
                 // Errors when executing statements shall not be propagated as is, because
                 // the scope must get cleaned up properly at the end of the block.
                 self.env.create_scope();
@@ -109,10 +117,29 @@ impl<'a, W: Write> Evaluator<'a, W> {
                     writer.write_fmt(format_args!("{}\n", expr_value.to_string()))?;
                 }
             }
+            Stmt::If {
+                condition,
+                if_statement,
+                else_statement,
+                ..
+            } => {
+                let cond_value = self.eval_expr(condition)?;
+                if Self::is_truthy(&cond_value) {
+                    self.eval(if_statement)?;
+                } else if let Some(else_statement) = else_statement {
+                    self.eval(&else_statement)?;
+                }
+            }
+            Stmt::While {
+                condition, body, ..
+            } => {
+                while Self::is_truthy(&self.eval_expr(condition)?) {
+                    self.eval(body)?;
+                }
+            }
         }
         Ok(())
     }
-
     fn eval_stmts(&mut self, statements: &Vec<Stmt>) -> Result<()> {
         for stmt in statements {
             self.eval(stmt)?
@@ -139,9 +166,8 @@ impl<'a, W: Write> Evaluator<'a, W> {
                 }
             }
             Expr::Assign { name, expr, loc } => {
-                if self.env.has_variable(name) {
-                    let value = self.eval_expr(expr)?;
-                    self.env.define_variable(name, value.clone());
+                let value = self.eval_expr(expr)?;
+                if self.env.assign_variable(name, value.clone()) {
                     Ok(value)
                 } else {
                     Err(emit_diagnostic(
@@ -681,6 +707,19 @@ mod tests {
     }
 
     #[test]
+    fn test_eval_assignment_single_in_lexical_scope() {
+        let ast = new_variable_assignment("name", new_literal_expr(Literal::Number(10.0)));
+        let mut evaluator = new_test_evaluator();
+        evaluator
+            .env
+            .define_variable("name", ExprValue::Number(1.0));
+        evaluator.env.create_scope();
+        let value = evaluator.eval_expr(&ast).unwrap();
+        evaluator.env.drop_innermost_scope();
+        assert!(matches!(value, ExprValue::Number(10.0)));
+    }
+
+    #[test]
     fn test_eval_assignment_nested() {
         let ast = new_variable_assignment(
             "name",
@@ -739,21 +778,24 @@ mod tests {
 
     #[test]
     fn test_eval_variable_usage() {
-        let ast = Stmt::List(vec![
-            Stmt::VarDecl {
-                identifier: "name".into(),
-                init_expr: Box::new(new_literal_expr(Literal::Number(2.0))),
-                loc: default_loc_span(),
-            },
-            Stmt::VarDecl {
-                identifier: "name_copied".into(),
-                init_expr: Box::new(Expr::Variable {
-                    name: "name".into(),
+        let ast = Stmt::List {
+            statements: vec![
+                Stmt::VarDecl {
+                    identifier: "name".into(),
+                    init_expr: Box::new(new_literal_expr(Literal::Number(2.0))),
                     loc: default_loc_span(),
-                }),
-                loc: default_loc_span(),
-            },
-        ]);
+                },
+                Stmt::VarDecl {
+                    identifier: "name_copied".into(),
+                    init_expr: Box::new(Expr::Variable {
+                        name: "name".into(),
+                        loc: default_loc_span(),
+                    }),
+                    loc: default_loc_span(),
+                },
+            ],
+            loc: default_loc_span(),
+        };
 
         let mut evaluator = new_test_evaluator();
         evaluator.eval(&ast).unwrap();
@@ -780,6 +822,102 @@ mod tests {
         assert_eq!(
             evaluator.env.get_variable("name").unwrap(),
             ExprValue::String("string".into())
+        );
+    }
+
+    #[test]
+    fn test_eval_if_statement() {
+        let ast = Stmt::If {
+            condition: Box::new(new_literal_expr(Literal::Number(1.0))),
+            if_statement: Box::new(Stmt::Expr {
+                expr: Box::new(new_variable_assignment(
+                    "name",
+                    new_literal_expr(Literal::String("string".into())),
+                )),
+                loc: default_loc_span(),
+            }),
+            else_statement: None,
+            loc: default_loc_span(),
+        };
+        let mut evaluator = new_test_evaluator();
+        evaluator.env.define_variable("name", ExprValue::Nil);
+        evaluator.eval(&ast).unwrap();
+
+        assert_eq!(
+            evaluator.env.get_variable("name").unwrap(),
+            ExprValue::String("string".into())
+        );
+    }
+
+    #[test]
+    fn test_eval_if_else_statement() {
+        let ast = Stmt::If {
+            condition: Box::new(new_literal_expr(Literal::Boolean(false))),
+            if_statement: Box::new(Stmt::Expr {
+                expr: Box::new(new_variable_assignment(
+                    "name",
+                    new_literal_expr(Literal::String("string".into())),
+                )),
+                loc: default_loc_span(),
+            }),
+            else_statement: Some(Box::new(Stmt::Expr {
+                expr: Box::new(new_variable_assignment(
+                    "name",
+                    new_literal_expr(Literal::Number(10.0)),
+                )),
+                loc: default_loc_span(),
+            })),
+            loc: default_loc_span(),
+        };
+        let mut evaluator = new_test_evaluator();
+        evaluator.env.define_variable("name", ExprValue::Nil);
+        evaluator.eval(&ast).unwrap();
+
+        assert_eq!(
+            evaluator.env.get_variable("name").unwrap(),
+            ExprValue::Number(10.0)
+        );
+    }
+
+    #[test]
+    fn test_eval_while_statement() {
+        let ast = Stmt::While {
+            condition: Box::new(new_binary_expr(
+                BinaryOperator::LessThan,
+                Expr::Variable {
+                    name: "name".into(),
+                    loc: default_loc_span(),
+                },
+                new_literal_expr(Literal::Number(10.0)),
+            )),
+            body: Box::new(Stmt::Expr {
+                expr: Box::new(new_variable_assignment(
+                    "name",
+                    new_binary_expr(
+                        BinaryOperator::Add,
+                        Expr::Variable {
+                            name: "name".into(),
+                            loc: default_loc_span(),
+                        },
+                        Expr::Literal {
+                            literal: Literal::Number(1.0),
+                            loc: default_loc_span(),
+                        },
+                    ),
+                )),
+                loc: default_loc_span(),
+            }),
+            loc: default_loc_span(),
+        };
+        let mut evaluator = new_test_evaluator();
+        evaluator
+            .env
+            .define_variable("name", ExprValue::Number(0.0));
+        evaluator.eval(&ast).unwrap();
+
+        assert_eq!(
+            evaluator.env.get_variable("name").unwrap(),
+            ExprValue::Number(10.0)
         );
     }
 }
