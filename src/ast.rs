@@ -21,10 +21,64 @@
 //!         < 4 >
 //!         < 1 >
 
-use crate::diagnostics::LocationSpan;
-
 pub mod eval;
 pub mod printer;
+
+use crate::diagnostics::LocationSpan;
+
+/// Statements.
+#[derive(PartialEq, Debug)]
+struct Stmt {
+    data: StmtData,
+    loc: LocationSpan,
+}
+
+impl Stmt {
+    pub fn new(data: StmtData, loc: LocationSpan) -> Self {
+        Self { data, loc }
+    }
+
+    pub fn new_as_box(data: StmtData, loc: LocationSpan) -> Box<Self> {
+        Box::new(Self::new(data, loc))
+    }
+
+    pub fn get_data(&self) -> &StmtData {
+        &self.data
+    }
+
+    pub fn get_loc(&self) -> &LocationSpan {
+        &self.loc
+    }
+}
+
+#[derive(PartialEq, Debug)]
+pub enum StmtData {
+    List {
+        statements: Vec<Stmt>,
+    },
+    Block {
+        statements: Vec<Stmt>,
+    },
+    VarDecl {
+        identifier: String,
+        init_expr: Box<Expr>,
+    },
+    Expr {
+        expr: Box<Expr>,
+    },
+    Print {
+        expr: Box<Expr>,
+    },
+    If {
+        condition: Box<Expr>,
+        if_statement: Box<Stmt>,
+        else_statement: Option<Box<Stmt>>,
+    },
+    While {
+        condition: Box<Expr>,
+        body: Box<Stmt>,
+    },
+}
 
 #[derive(PartialEq, Debug)]
 pub enum UnaryOperator {
@@ -34,7 +88,7 @@ pub enum UnaryOperator {
 
 impl ToString for UnaryOperator {
     fn to_string(&self) -> String {
-        match *self {
+        match self {
             UnaryOperator::Minus => String::from("-"),
             UnaryOperator::Not => String::from("!"),
         }
@@ -57,7 +111,7 @@ pub enum BinaryOperator {
 
 impl ToString for BinaryOperator {
     fn to_string(&self) -> String {
-        match *self {
+        match self {
             BinaryOperator::Add => String::from("+"),
             BinaryOperator::Substract => String::from("-"),
             BinaryOperator::Multiply => String::from("*"),
@@ -72,6 +126,7 @@ impl ToString for BinaryOperator {
     }
 }
 
+/// Expression Literal.
 #[derive(PartialEq, Debug)]
 pub enum Literal {
     Number(f64),
@@ -80,97 +135,111 @@ pub enum Literal {
     Nil,
 }
 
+/// Expression.
 #[derive(PartialEq, Debug)]
-pub enum Expr {
-    Binary {
-        lhs: Box<Expr>,
-        op: BinaryOperator,
-        rhs: Box<Expr>,
-        loc: LocationSpan,
-    },
-    Unary {
-        op: UnaryOperator,
-        expr: Box<Expr>,
-        loc: LocationSpan,
-    },
-    Literal {
-        literal: Literal,
-        loc: LocationSpan,
-    },
-    Grouping {
-        expr: Box<Expr>,
-        loc: LocationSpan,
-    },
-    Variable {
-        name: String,
-        loc: LocationSpan,
-    },
-    Assign {
-        name: String,
-        expr: Box<Expr>,
-        loc: LocationSpan,
-    },
+pub struct Expr {
+    data: ExprData,
+    loc: LocationSpan,
 }
 
 impl Expr {
+    pub fn new(data: ExprData, loc: LocationSpan) -> Self {
+        Self { data, loc }
+    }
+
+    pub fn new_as_box(data: ExprData, loc: LocationSpan) -> Box<Self> {
+        Box::new(Self::new(data, loc))
+    }
+
+    pub fn get_data(&self) -> &ExprData {
+        &self.data
+    }
+
     pub fn get_loc(&self) -> &LocationSpan {
-        match self {
-            Expr::Binary { loc, .. } => loc,
-            Expr::Unary { loc, .. } => loc,
-            Expr::Grouping { loc, .. } => loc,
-            Expr::Literal { loc, .. } => loc,
-            Expr::Variable { loc, .. } => loc,
-            Expr::Assign { loc, .. } => loc,
-        }
+        &self.loc
     }
 }
 
 #[derive(PartialEq, Debug)]
-pub enum Stmt {
-    List {
-        statements: Vec<Stmt>,
-        loc: LocationSpan,
+pub enum ExprData {
+    Binary {
+        lhs: Box<Expr>,
+        op: BinaryOperator,
+        rhs: Box<Expr>,
     },
-    Block {
-        statements: Vec<Stmt>,
-        loc: LocationSpan,
-    },
-    VarDecl {
-        identifier: String,
-        init_expr: Box<Expr>,
-        loc: LocationSpan,
-    },
-    Expr {
+    Unary {
+        op: UnaryOperator,
         expr: Box<Expr>,
-        loc: LocationSpan,
     },
-    Print {
+    Literal {
+        literal: Literal,
+    },
+    Grouping {
         expr: Box<Expr>,
-        loc: LocationSpan,
     },
-    If {
-        condition: Box<Expr>,
-        if_statement: Box<Stmt>,
-        else_statement: Option<Box<Stmt>>,
-        loc: LocationSpan,
+    Variable {
+        name: String,
     },
-    While {
-        condition: Box<Expr>,
-        body: Box<Stmt>,
-        loc: LocationSpan,
+    Assign {
+        name: String,
+        expr: Box<Expr>,
     },
 }
 
-impl Stmt {
-    pub fn get_loc(&self) -> &LocationSpan {
-        match self {
-            Stmt::Block { loc, .. } => loc,
-            Stmt::Expr { loc, .. } => loc,
-            Stmt::If { loc, .. } => loc,
-            Stmt::List { loc, .. } => loc,
-            Stmt::Print { loc, .. } => loc,
-            Stmt::VarDecl { loc, .. } => loc,
-            Stmt::While { loc, .. } => loc,
+#[cfg(test)]
+pub mod tests {
+    fn new_literal_expr(literal: Literal) -> Expr {
+        Expr::Literal {
+            literal: literal,
+            loc: default_loc_span(),
+        }
+    }
+
+    fn new_binary_expr(op: BinaryOperator, lhs: Expr, rhs: Expr) -> Expr {
+        Expr::Binary {
+            lhs: Box::new(lhs),
+            op,
+            rhs: Box::new(rhs),
+            loc: default_loc_span(),
+        }
+    }
+
+    fn new_binary_expr_number(op: BinaryOperator, lhs: f64, rhs: f64) -> Expr {
+        new_binary_expr(
+            op,
+            new_literal_expr(Literal::Number(lhs)),
+            new_literal_expr(Literal::Number(rhs)),
+        )
+    }
+
+    fn new_binary_expr_str(op: BinaryOperator, lhs: &str, rhs: &str) -> Expr {
+        new_binary_expr(
+            op,
+            new_literal_expr(Literal::String(lhs.to_string())),
+            new_literal_expr(Literal::String(rhs.to_string())),
+        )
+    }
+
+    fn new_unary_expr(op: UnaryOperator, expr: Expr) -> Expr {
+        Expr::Unary {
+            op,
+            expr: Box::new(expr),
+            loc: default_loc_span(),
+        }
+    }
+
+    fn new_grouping_expr(expr: Expr) -> Expr {
+        Expr::Grouping {
+            expr: Box::new(expr),
+            loc: default_loc_span(),
+        }
+    }
+
+    fn new_variable_assignment(name: &str, expr: Expr) -> Expr {
+        Expr::Assign {
+            name: name.into(),
+            expr: Box::new(expr),
+            loc: default_loc_span(),
         }
     }
 }
