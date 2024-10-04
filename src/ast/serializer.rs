@@ -37,12 +37,11 @@ pub struct AstSerializerOptions {
 /// This class may be used for different purposes, e.g. to store the AST to a file or use it for
 /// testing purpose to easily compare two ASTs structurally.
 ///
-/// Note on Performance: the performance of the serialization is sub-optimal due to many inefficient
-/// string operations and recursions. For example: the indentation is achieved by "unwinding" the
-/// call stack und repeatedly adding the next-level indentation. The design however has nevertheless
-/// been chosen due to simplicity of the serialization code itself. The sub-optimal performance is accepted
-/// as of now because the serialization is seldomly used in production and mostly for development, debugging
-/// and testing purpose.
+/// Note on Performance: the performance of the serialization code is sub-optimal due to many inefficient
+/// string operations and recursive function calls. For example: the indentation of the sub entries is achieved
+/// by "unwinding" call stack and repeatedly add the next-level indentation. The design has nevertheless been chosen
+/// due to the simplicity of the actual code. Due to the fact that this code is seldomly used in production and mostly
+/// for development, debugging and testing purpose, the disadvantages are accepted as of now.
 struct AstTopologicalSerializer {
     options: AstSerializerOptions,
 }
@@ -58,18 +57,27 @@ impl AstTopologicalSerializer {
         self.serialize_stmt(stmt)
     }
 
-    fn generate_ast_entry(
+    fn get_indent_as_string(indent: i64) -> String {
+        std::iter::repeat(" ")
+            .take(indent as usize)
+            .collect::<String>()
+    }
+
+    fn get_loc_string(&self, loc: &LocationSpan) -> String {
+        let mut loc_string = String::new();
+        if self.options.include_location {
+            loc_string = format!(" [{}]", loc.to_string());
+        }
+        loc_string
+    }
+
+    fn generate_ast_serialization(
         &self,
         tag: &str,
         loc: &LocationSpan,
         sub_entries: Vec<String>,
     ) -> String {
-        let mut content = String::default();
-        if self.options.include_location {
-            content += &format!("({} [{}]\n", tag, loc.to_string());
-        } else {
-            content += &format!("({}\n", tag)
-        }
+        let mut content = format!("({}{}\n", tag, self.get_loc_string(loc));
         for sub_entry in sub_entries {
             content += &format!(
                 "{}{}",
@@ -81,12 +89,25 @@ impl AstTopologicalSerializer {
         content
     }
 
+    fn generate_ast_serialization_for_literal(
+        &self,
+        tag: &str,
+        loc: &LocationSpan,
+        value: Option<String>,
+    ) -> String {
+        let mut value_string = String::new();
+        if let Some(value) = value {
+            value_string = value;
+        }
+        format!("({}{}){}", tag, value_string, self.get_loc_string(loc))
+    }
+
     fn serialize_stmt(&self, stmt: &Stmt) -> String {
         let loc = stmt.get_loc();
         match &stmt.data {
             StmtData::Block { statements } => self.serialize_stmt_list("block", loc, statements),
             StmtData::Expr { expr } => {
-                self.generate_ast_entry("expr", loc, vec![self.serialize_expr(expr)])
+                self.generate_ast_serialization("expr", loc, vec![self.serialize_expr(expr)])
             }
             StmtData::If {
                 condition,
@@ -100,21 +121,21 @@ impl AstTopologicalSerializer {
                 if let Some(else_statement) = else_statement {
                     sub_entries.push(self.serialize_stmt(else_statement));
                 }
-                self.generate_ast_entry(tag, loc, sub_entries)
+                self.generate_ast_serialization("if", loc, sub_entries)
             }
             StmtData::List { statements } => self.serialize_stmt_list("list", loc, statements),
             StmtData::Print { expr } => {
-                self.generate_ast_entry_single("print", loc, self.serialize_expr(expr))
+                self.generate_ast_serialization("print", loc, vec![self.serialize_expr(expr)])
             }
             StmtData::VarDecl {
                 identifier,
                 init_expr,
-            } => self.generate_ast_entry(
+            } => self.generate_ast_serialization(
                 "var-decl",
                 loc,
                 vec![identifier.clone(), self.serialize_expr(init_expr)],
             ),
-            StmtData::While { condition, body } => self.generate_ast_entry_single(
+            StmtData::While { condition, body } => self.generate_ast_serialization(
                 "while",
                 loc,
                 vec![self.serialize_expr(condition), self.serialize_stmt(body)],
@@ -122,84 +143,52 @@ impl AstTopologicalSerializer {
         }
     }
 
+    fn serialize_stmt_list(&self, tag: &str, loc: &LocationSpan, statements: &Vec<Stmt>) -> String {
+        let serialized_statements: Vec<String> = statements
+            .iter()
+            .map(|stmt| self.serialize_stmt(stmt))
+            .collect();
+        self.generate_ast_serialization(tag, loc, serialized_statements)
+    }
+
     fn serialize_expr(&self, expr: &Expr) -> String {
         let loc = expr.get_loc();
         match &expr.data {
-            ExprData::Binary { lhs, op, rhs } => self.generate_ast_entry(
+            ExprData::Binary { lhs, op, rhs } => self.generate_ast_serialization(
                 &op.to_string(),
                 loc,
                 vec![self.serialize_expr(lhs), self.serialize_expr(rhs)],
             ),
-            ExprData::Unary { op, expr } => {
-                let op_str = op.to_string();
-                let expr_str = print_expr(expr, indent + INDENT_NEXT_LEVEL);
-                format!(
-                    "{}{} [{}]\n{}",
-                    get_indent_as_string(indent),
-                    op_str,
-                    loc.to_string(),
-                    expr_str
-                )
+            ExprData::Unary { op, expr } => self.generate_ast_serialization(
+                &op.to_string(),
+                loc,
+                vec![self.serialize_expr(expr)],
+            ),
+            ExprData::Grouping { expr } => {
+                self.generate_ast_serialization("group", loc, vec![self.serialize_expr(expr)])
             }
-            Expr::Grouping { expr, loc } => {
-                let expr_str = print_expr(expr, indent + INDENT_NEXT_LEVEL);
-                format!(
-                    "{}() [{}]\n{}",
-                    get_indent_as_string(indent),
-                    loc.to_string(),
-                    expr_str
-                )
+            ExprData::Variable { name } => {
+                self.generate_ast_serialization("var", loc, vec![name.clone()])
             }
-            Expr::Variable { name, loc } => {
-                format!(
-                    "{}<var: {}> [{}]",
-                    get_indent_as_string(indent),
-                    name,
-                    loc.to_string()
-                )
-            }
-            Expr::Assign { name, expr, loc } => {
-                let expr_str = print_expr(expr, indent + INDENT_NEXT_LEVEL);
-                format!(
-                    "{}= [{}]\n{}{}\n{}",
-                    get_indent_as_string(indent),
-                    loc.to_string(),
-                    get_indent_as_string(indent + INDENT_NEXT_LEVEL),
-                    name,
-                    expr_str,
-                )
-            }
-            Expr::Literal {
+            ExprData::Assign { name, expr } => self.generate_ast_serialization(
+                "assign",
+                loc,
+                vec![name.clone(), self.serialize_expr(expr)],
+            ),
+            ExprData::Literal {
                 literal: Literal::Boolean(value),
-                loc,
-            } => format!(
-                "{}{} [{}]",
-                get_indent_as_string(indent),
-                value,
-                loc.to_string()
-            ),
-            Expr::Literal {
+            } => self.generate_ast_serialization_for_literal("bool", loc, Some(value.to_string())),
+            ExprData::Literal {
                 literal: Literal::Nil,
-                loc,
-            } => format!("{}nil [{}]", get_indent_as_string(indent), loc.to_string()),
-            Expr::Literal {
+            } => self.generate_ast_serialization_for_literal("nil", loc, None),
+            ExprData::Literal {
                 literal: Literal::String(value),
-                loc,
-            } => format!(
-                "{}\"{}\" [{}]",
-                get_indent_as_string(indent),
-                value,
-                loc.to_string()
-            ),
-            Expr::Literal {
+            } => self.generate_ast_serialization_for_literal("string", loc, Some(value.clone())),
+            ExprData::Literal {
                 literal: Literal::Number(value),
-                loc,
-            } => format!(
-                "{}{} [{}]",
-                get_indent_as_string(indent),
-                value,
-                loc.to_string()
-            ),
+            } => {
+                self.generate_ast_serialization_for_literal("string", loc, Some(value.to_string()))
+            }
         }
     }
 }

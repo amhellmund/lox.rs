@@ -16,7 +16,7 @@ mod token_sequence;
 
 use std::path::PathBuf;
 
-use crate::ast::{BinaryOperator, Expr, Literal, Stmt, StmtData, UnaryOperator};
+use crate::ast::{BinaryOperator, Expr, ExprData, Literal, Stmt, StmtData, UnaryOperator};
 use crate::diagnostics::{emit_diagnostic, FileLocation, Location, LocationSpan};
 use crate::scanner::{Token, TokenType};
 use anyhow::Result;
@@ -241,10 +241,12 @@ impl Parser {
         let expr = self.parse_expression()?;
         let semicolon_token = self.consume_or_error(TokenType::Semicolon)?;
 
-        Ok(Stmt::Print {
-            expr: Box::new(expr),
-            loc: LocationSpan::new(print_token.location, semicolon_token.location),
-        })
+        Ok(Stmt::new(
+            StmtData::Print {
+                expr: Box::new(expr),
+            },
+            LocationSpan::new(print_token.location, semicolon_token.location),
+        ))
     }
 
     /// Parses an expression statement.
@@ -258,10 +260,12 @@ impl Parser {
 
         // The start location of the expression gets preserved because the expr gets moved into the statement.
         let start_loc = expr.get_loc().start;
-        Ok(Stmt::Expr {
-            expr: Box::new(expr),
-            loc: LocationSpan::new(start_loc, semicolon_token.location),
-        })
+        Ok(Stmt::new(
+            StmtData::Expr {
+                expr: Box::new(expr),
+            },
+            LocationSpan::new(start_loc, semicolon_token.location),
+        ))
     }
 
     /// Parses a block statement.
@@ -273,7 +277,7 @@ impl Parser {
     /// This function assumes that the '{' token has not yet been consumed.
     fn parse_block_statement(&mut self) -> Result<Stmt> {
         let (statements, loc) = self.parse_block()?;
-        Ok(Stmt::Block { statements, loc })
+        Ok(Stmt::new(StmtData::Block { statements }, loc))
     }
 
     /// Helper function to parse a block with statements.
@@ -316,12 +320,14 @@ impl Parser {
             loc.end_inclusive = else_statement.as_ref().unwrap().get_loc().end_inclusive;
         }
 
-        Ok(Stmt::If {
-            condition,
-            if_statement,
-            else_statement,
+        Ok(Stmt::new(
+            StmtData::If {
+                condition,
+                if_statement,
+                else_statement,
+            },
             loc,
-        })
+        ))
     }
 
     /// Parses a While statement.
@@ -339,11 +345,7 @@ impl Parser {
         let body = Box::new(self.parse_statement()?);
 
         let loc = LocationSpan::new(while_token.location, body.get_loc().end_inclusive);
-        Ok(Stmt::While {
-            condition,
-            body,
-            loc,
-        })
+        Ok(Stmt::new(StmtData::While { condition, body }, loc))
     }
 
     /// Parses an expression (lowest precedence -> highest in AST (sub)hierarchy).
@@ -365,16 +367,18 @@ impl Parser {
         if let Some(_) = self.consume_if_has_token_type(&[TokenType::Equal]) {
             let rvalue_expr = self.parse_assignment()?;
 
-            if let Expr::Variable { name, .. } = &lvalue_expr {
+            if let ExprData::Variable { name, .. } = &lvalue_expr.get_data() {
                 let loc = LocationSpan::new(
                     lvalue_expr.get_loc().start,
                     rvalue_expr.get_loc().end_inclusive,
                 );
-                Ok(Expr::Assign {
-                    name: name.clone(),
-                    expr: Box::new(rvalue_expr),
-                    loc: loc,
-                })
+                Ok(Expr::new(
+                    ExprData::Assign {
+                        name: name.clone(),
+                        expr: Box::new(rvalue_expr),
+                    },
+                    loc,
+                ))
             } else {
                 Err(emit_diagnostic(
                     format!("Invalid lvalue for assignment"),
@@ -409,12 +413,14 @@ impl Parser {
 
             // The locations must get merged before the rhs expression gets moved into the new binary expression.
             let loc = LocationSpan::new(expr.get_loc().start, rhs.get_loc().end_inclusive);
-            expr = Expr::Binary {
-                lhs: Box::new(expr),
-                op,
-                rhs: Box::new(rhs),
+            expr = Expr::new(
+                ExprData::Binary {
+                    lhs: Box::new(expr),
+                    op,
+                    rhs: Box::new(rhs),
+                },
                 loc,
-            }
+            )
         }
         Ok(expr)
     }
@@ -480,28 +486,32 @@ impl Parser {
             let expr = self.parse_primary()?;
             // The location must get preserved before the expression gets moved into the new unary expression
             let loc = LocationSpan::new(token.location, expr.get_loc().end_inclusive);
-            Ok(Expr::Unary {
-                op,
-                expr: Box::new(expr),
+            Ok(Expr::new(
+                ExprData::Unary {
+                    op,
+                    expr: Box::new(expr),
+                },
                 loc,
-            })
+            ))
         } else {
             self.parse_primary()
         }
     }
 
     fn create_expr_from_literal_and_token(literal: Literal, token: &Token) -> Result<Expr> {
-        Ok(Expr::Literal {
-            literal,
-            loc: Self::create_location_span_from_token(token),
-        })
+        Ok(Expr::new(
+            ExprData::Literal { literal },
+            Self::create_location_span_from_token(token),
+        ))
     }
 
     fn create_variable_from_token(token: &Token) -> Result<Expr> {
-        Ok(Expr::Variable {
-            name: token.lexeme.clone(),
-            loc: Self::create_location_span_from_token(token),
-        })
+        Ok(Expr::new(
+            ExprData::Variable {
+                name: token.lexeme.clone(),
+            },
+            Self::create_location_span_from_token(token),
+        ))
     }
 
     /// Parses a primary expression.
@@ -539,10 +549,12 @@ impl Parser {
                 if let Some(closing_token) =
                     self.consume_if_has_token_type(&[TokenType::RightParanthesis])
                 {
-                    return Ok(Expr::Grouping {
-                        expr: Box::new(expr),
-                        loc: LocationSpan::new(token.location, closing_token.location),
-                    });
+                    return Ok(Expr::new(
+                        ExprData::Grouping {
+                            expr: Box::new(expr),
+                        },
+                        LocationSpan::new(token.location, closing_token.location),
+                    ));
                 } else {
                     let cur_token = self.tokens.current();
                     return Err(emit_diagnostic(

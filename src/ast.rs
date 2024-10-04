@@ -21,7 +21,7 @@
 //!         < 4 >
 //!         < 1 >
 
-pub mod eval;
+// pub mod interpreter;
 pub mod serializer;
 
 use crate::diagnostics::LocationSpan;
