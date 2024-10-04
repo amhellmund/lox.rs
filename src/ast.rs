@@ -22,7 +22,7 @@
 //!         < 1 >
 
 pub mod eval;
-pub mod printer;
+pub mod serializer;
 
 use crate::diagnostics::LocationSpan;
 

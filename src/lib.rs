@@ -9,7 +9,7 @@
 
 use anyhow::{Context, Result};
 use ast::eval::{eval_stmt, Evaluator};
-use ast::printer::print_ast;
+use ast::serializer::print_ast;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::{fs, io};
