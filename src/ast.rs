@@ -53,26 +53,26 @@ impl Stmt {
 
 #[derive(PartialEq, Debug)]
 pub enum StmtData {
-    List {
-        statements: Vec<Stmt>,
-    },
     Block {
         statements: Vec<Stmt>,
     },
-    VarDecl {
-        identifier: String,
-        init_expr: Box<Expr>,
-    },
     Expr {
-        expr: Box<Expr>,
-    },
-    Print {
         expr: Box<Expr>,
     },
     If {
         condition: Box<Expr>,
         if_statement: Box<Stmt>,
-        else_statement: Option<Box<Stmt>>,
+        else_statement: Box<Option<Stmt>>,
+    },
+    List {
+        statements: Vec<Stmt>,
+    },
+    Print {
+        expr: Box<Expr>,
+    },
+    VarDecl {
+        identifier: String,
+        init_expr: Box<Expr>,
     },
     While {
         condition: Box<Expr>,
@@ -198,7 +198,7 @@ pub enum ExprData {
 pub mod tests {
     use crate::diagnostics::{Location, LocationSpan};
 
-    use super::{BinaryOperator, Expr, ExprData, Literal, Stmt, UnaryOperator};
+    use super::{BinaryOperator, Expr, ExprData, Literal, Stmt, StmtData, UnaryOperator};
 
     /// Compares two statements for equality without into account the 'data' field only.
     ///
@@ -222,8 +222,40 @@ pub mod tests {
         }
     }
 
+    // Creates a new statement by setting the location to a default value.
+    pub fn new_stmt(stmt_data: StmtData) -> Stmt {
+        Stmt {
+            data: stmt_data,
+            loc: default_loc_span(),
+        }
+    }
+
+    /// Creates a new print statement.
+    pub fn new_print_stmt(expr: Expr) -> Stmt {
+        new_stmt(StmtData::Print {
+            expr: Box::new(expr),
+        })
+    }
+
+    // Creates a new variable declaration statement
+    pub fn new_var_decl_stmt(identifier: &str, init_expr: Expr) -> Stmt {
+        new_stmt(StmtData::VarDecl {
+            identifier: identifier.to_string(),
+            init_expr: Box::new(init_expr),
+        })
+    }
+
+    /// Creates a new if-else statement.
+    pub fn new_if_else_stmt(condition: Expr, if_stmt: Stmt, else_stmt: Option<Stmt>) -> Stmt {
+        new_stmt(StmtData::If {
+            condition: Box::new(condition),
+            if_statement: Box::new(if_stmt),
+            else_statement: Box::new(else_stmt),
+        })
+    }
+
     /// Creates a new expression by setting the location to a default value.
-    fn new_expr(expr_data: ExprData) -> Expr {
+    pub fn new_expr(expr_data: ExprData) -> Expr {
         Expr {
             data: expr_data,
             loc: default_loc_span(),
@@ -231,13 +263,18 @@ pub mod tests {
     }
 
     /// Creates a new literal expression from a scalar literal value.
-    fn new_literal_expr(literal: Literal) -> Expr {
+    pub fn new_literal_expr(literal: Literal) -> Expr {
         new_expr(ExprData::Literal { literal })
     }
 
     /// Creates a new number literal from any type convertible to the target type.
-    fn new_number_literal<T: Into<f64>>(value: T) -> Expr {
+    pub fn new_number_literal<T: Into<f64>>(value: T) -> Expr {
         new_literal_expr(Literal::Number(value.into()))
+    }
+
+    // Creates a new boolean literal.
+    pub fn new_boolean_literal(value: bool) -> Expr {
+        new_literal_expr(Literal::Boolean(value))
     }
 
     /// Creates a new string literal.

@@ -80,7 +80,7 @@ impl AstTopologicalSerializer {
         let mut content = format!("({}{}\n", tag, self.get_loc_string(loc));
         for sub_entry in sub_entries {
             content += &format!(
-                "{}{}",
+                "{}{}\n",
                 Self::get_indent_as_string(Self::INDENT_NEXT_LEVEL),
                 sub_entry,
             );
@@ -97,7 +97,7 @@ impl AstTopologicalSerializer {
     ) -> String {
         let mut value_string = String::new();
         if let Some(value) = value {
-            value_string = value;
+            value_string = format!(" {}", value);
         }
         format!("({}{}){}", tag, value_string, self.get_loc_string(loc))
     }
@@ -187,8 +187,88 @@ impl AstTopologicalSerializer {
             ExprData::Literal {
                 literal: Literal::Number(value),
             } => {
-                self.generate_ast_serialization_for_literal("string", loc, Some(value.to_string()))
+                self.generate_ast_serialization_for_literal("number", loc, Some(value.to_string()))
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::ast::{
+        tests::{
+            new_boolean_literal, new_if_stmt, new_literal_expr, new_number_literal, new_print_stmt,
+        },
+        Literal, Stmt,
+    };
+
+    use super::{AstSerializerOptions, AstTopologicalSerializer};
+
+    use crate::ast::tests::{new_expr, new_var_decl_stmt};
+
+    fn test_serialize(stmt: Stmt, expected: String) {
+        let ser = AstTopologicalSerializer::new(AstSerializerOptions {
+            include_location: false,
+        });
+        let output = ser.serialize(&stmt);
+        assert_eq!(output, expected);
+    }
+
+    fn expect_builder(tag: &str, sub_builder: Vec<String>) -> String {
+        let mut content = format!("({}\n", tag);
+        for sub in sub_builder {
+            content += &format!(
+                "{}{}\n",
+                AstTopologicalSerializer::get_indent_as_string(
+                    AstTopologicalSerializer::INDENT_NEXT_LEVEL
+                ),
+                sub
+            )
+        }
+        content += ")\n";
+        content
+    }
+
+    fn expect_builder_literal(tag: &str, value: String) -> String {
+        format!("({} {})", tag, value)
+    }
+
+    fn expect_builder_nil() -> String {
+        format!("(nil)")
+    }
+
+    fn expect_scalar(value: &str) -> String {
+        value.to_string()
+    }
+
+    #[test]
+    fn test_serialize_var_declaration() {
+        test_serialize(
+            new_var_decl_stmt("id", new_number_literal(0)),
+            expect_builder(
+                "var-decl",
+                vec![
+                    expect_scalar("id"),
+                    expect_builder_literal("number", 0.to_string()),
+                ],
+            ),
+        );
+    }
+
+    fn test_serialize_if_statement_without_else() {
+        test_serialize(
+            new_if_else_stmt(
+                new_boolean_literal(true),
+                new_print_stmt(new_number_literal(0)),
+                None,
+            ),
+            expect_builder(
+                "if",
+                vec![expect_builder(
+                    "print",
+                    vec![expect_builder_literal("number", 0.to_string())],
+                )],
+            ),
+        )
     }
 }
