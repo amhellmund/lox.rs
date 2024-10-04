@@ -62,7 +62,7 @@ pub enum StmtData {
     If {
         condition: Box<Expr>,
         if_statement: Box<Stmt>,
-        else_statement: Box<Option<Stmt>>,
+        else_statement: Option<Box<Stmt>>,
     },
     List {
         statements: Vec<Stmt>,
@@ -246,11 +246,20 @@ pub mod tests {
     }
 
     /// Creates a new if-else statement.
-    pub fn new_if_else_stmt(condition: Expr, if_stmt: Stmt, else_stmt: Option<Stmt>) -> Stmt {
+    pub fn new_if_stmt(condition: Expr, if_stmt: Stmt) -> Stmt {
         new_stmt(StmtData::If {
             condition: Box::new(condition),
             if_statement: Box::new(if_stmt),
-            else_statement: Box::new(else_stmt),
+            else_statement: None,
+        })
+    }
+
+    /// Creates a new if-else statement.
+    pub fn new_if_else_stmt(condition: Expr, if_stmt: Stmt, else_stmt: Stmt) -> Stmt {
+        new_stmt(StmtData::If {
+            condition: Box::new(condition),
+            if_statement: Box::new(if_stmt),
+            else_statement: Some(Box::new(else_stmt)),
         })
     }
 

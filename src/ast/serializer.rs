@@ -214,7 +214,19 @@ mod tests {
         assert_eq!(output, expected);
     }
 
-    fn expect_builder(tag: &str, sub_builder: Vec<String>) -> String {
+    macro_rules! expect_builder {
+        ( $( $tag:expr), $( $x:expr ),* ) => {
+            {
+                let mut temp_vec = Vec::new();
+                $(
+                    temp_vec.push($x);
+                )*
+                temp_vec
+            }
+        };
+    }
+
+    fn expect_builder_impl(tag: &str, sub_builder: Vec<String>) -> String {
         let mut content = format!("({}\n", tag);
         for sub in sub_builder {
             content += &format!(
@@ -229,7 +241,7 @@ mod tests {
         content
     }
 
-    fn expect_builder_literal(tag: &str, value: String) -> String {
+    fn expect_builder_literal(tag: &str, value: &str) -> String {
         format!("({} {})", tag, value)
     }
 
@@ -247,27 +259,24 @@ mod tests {
             new_var_decl_stmt("id", new_number_literal(0)),
             expect_builder(
                 "var-decl",
-                vec![
-                    expect_scalar("id"),
-                    expect_builder_literal("number", 0.to_string()),
-                ],
+                vec![expect_scalar("id"), expect_builder_literal("number", "0")],
             ),
         );
     }
 
+    #[test]
     fn test_serialize_if_statement_without_else() {
         test_serialize(
-            new_if_else_stmt(
+            new_if_stmt(
                 new_boolean_literal(true),
                 new_print_stmt(new_number_literal(0)),
-                None,
             ),
             expect_builder(
                 "if",
-                vec![expect_builder(
-                    "print",
-                    vec![expect_builder_literal("number", 0.to_string())],
-                )],
+                vec![
+                    expect_builder_literal("bool", "true"),
+                    expect_builder("print", vec![expect_builder_literal("number", "0")]),
+                ],
             ),
         )
     }

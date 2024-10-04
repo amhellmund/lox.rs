@@ -309,22 +309,22 @@ impl Parser {
     fn parse_if_statement(&mut self) -> Result<Stmt> {
         let if_token = self.consume_or_error(TokenType::If)?;
         self.consume_or_error(TokenType::LeftParanthesis)?;
-        let condition = self.parse_expression()?;
+        let condition = Box::new(self.parse_expression()?);
         self.consume_or_error(TokenType::RightParanthesis)?;
-        let if_statement = self.parse_statement()?;
+        let if_statement = Box::new(self.parse_statement()?);
 
-        let mut else_statement: Option<Stmt> = None;
+        let mut else_statement: Option<Box<Stmt>> = None;
         let mut loc = LocationSpan::new(if_token.location, if_statement.get_loc().end_inclusive);
         if self.consume_if_has_token_type(&[TokenType::Else]).is_some() {
-            else_statement = Some(self.parse_statement()?);
+            else_statement = Some(Box::new(self.parse_statement()?));
             loc.end_inclusive = else_statement.as_ref().unwrap().get_loc().end_inclusive;
         }
 
         Ok(Stmt::new(
             StmtData::If {
-                condition: Box::new(condition),
-                if_statement: Box::new(if_statement),
-                else_statement: Box::new(else_statement),
+                condition,
+                if_statement,
+                else_statement,
             },
             loc,
         ))
