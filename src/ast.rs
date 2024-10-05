@@ -25,6 +25,8 @@
 pub mod serializer;
 
 use crate::diagnostics::LocationSpan;
+use strum::IntoEnumIterator;
+use strum_macros::{EnumIter, EnumMessage};
 
 /// Statements.
 #[derive(PartialEq, Debug)]
@@ -80,7 +82,7 @@ pub enum StmtData {
     },
 }
 
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Debug, EnumIter)]
 pub enum UnaryOperator {
     Minus,
     Not,
@@ -95,7 +97,7 @@ impl ToString for UnaryOperator {
     }
 }
 
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Debug, EnumIter)]
 pub enum BinaryOperator {
     Add,
     Substract,
@@ -230,18 +232,17 @@ pub mod tests {
         }
     }
 
-    /// Creates a new print statement.
-    pub fn new_print_stmt(expr: Expr) -> Stmt {
-        new_stmt(StmtData::Print {
-            expr: Box::new(expr),
+    /// Creates a new block statement.
+    pub fn new_block_stmt(statements: Vec<Stmt>) -> Stmt {
+        new_stmt(StmtData::Block {
+            statements: statements,
         })
     }
 
-    // Creates a new variable declaration statement
-    pub fn new_var_decl_stmt(identifier: &str, init_expr: Expr) -> Stmt {
-        new_stmt(StmtData::VarDecl {
-            identifier: identifier.to_string(),
-            init_expr: Box::new(init_expr),
+    /// Creates a new expression statement.
+    pub fn new_expr_stmt(expr: Expr) -> Stmt {
+        new_stmt(StmtData::Expr {
+            expr: Box::new(expr),
         })
     }
 
@@ -263,6 +264,29 @@ pub mod tests {
         })
     }
 
+    /// Creates a new print statement.
+    pub fn new_print_stmt(expr: Expr) -> Stmt {
+        new_stmt(StmtData::Print {
+            expr: Box::new(expr),
+        })
+    }
+
+    /// Creates a new variable declaration statement.
+    pub fn new_var_decl_stmt(identifier: &str, init_expr: Expr) -> Stmt {
+        new_stmt(StmtData::VarDecl {
+            identifier: identifier.to_string(),
+            init_expr: Box::new(init_expr),
+        })
+    }
+
+    /// Creates a new while statement.
+    pub fn new_while_stmt(condition: Expr, body: Stmt) -> Stmt {
+        new_stmt(StmtData::While {
+            condition: Box::new(condition),
+            body: Box::new(body),
+        })
+    }
+
     /// Creates a new expression by setting the location to a default value.
     pub fn new_expr(expr_data: ExprData) -> Expr {
         Expr {
@@ -271,28 +295,36 @@ pub mod tests {
         }
     }
 
+    /// Creates a new assig expression.
+    pub fn new_assign_expr(name: &str, rvalue: Expr) -> Expr {
+        new_expr(ExprData::Assign {
+            name: name.into(),
+            expr: Box::new(rvalue),
+        })
+    }
+
     /// Creates a new literal expression from a scalar literal value.
     pub fn new_literal_expr(literal: Literal) -> Expr {
         new_expr(ExprData::Literal { literal })
     }
 
-    /// Creates a new number literal from any type convertible to the target type.
-    pub fn new_number_literal<T: Into<f64>>(value: T) -> Expr {
-        new_literal_expr(Literal::Number(value.into()))
-    }
-
     // Creates a new boolean literal.
-    pub fn new_boolean_literal(value: bool) -> Expr {
+    pub fn new_boolean_literal_expr(value: bool) -> Expr {
         new_literal_expr(Literal::Boolean(value))
     }
 
+    /// Creates a new number literal from any type convertible to the target type.
+    pub fn new_number_literal_expr<T: Into<f64>>(value: T) -> Expr {
+        new_literal_expr(Literal::Number(value.into()))
+    }
+
     /// Creates a new string literal.
-    fn new_string_literal(value: &str) -> Expr {
+    pub fn new_string_literal_expr(value: &str) -> Expr {
         new_literal_expr(Literal::String(String::from(value)))
     }
 
     /// Creates a new binary expression.
-    fn new_binary_expr(op: BinaryOperator, lhs: Expr, rhs: Expr) -> Expr {
+    pub fn new_binary_expr(op: BinaryOperator, lhs: Expr, rhs: Expr) -> Expr {
         new_expr(ExprData::Binary {
             lhs: lhs.as_box(),
             op,
@@ -300,26 +332,23 @@ pub mod tests {
         })
     }
 
+    /// Creating a grouping expression.
+    pub fn new_grouping_expr(expr: Expr) -> Expr {
+        new_expr(ExprData::Grouping {
+            expr: expr.as_box(),
+        })
+    }
+
     /// Creates a new unary expression.
-    fn new_unary_expr(op: UnaryOperator, expr: Expr) -> Expr {
+    pub fn new_unary_expr(op: UnaryOperator, expr: Expr) -> Expr {
         new_expr(ExprData::Unary {
             op,
             expr: expr.as_box(),
         })
     }
 
-    /// Creating a grouping expression.
-    fn new_grouping_expr(expr: Expr) -> Expr {
-        new_expr(ExprData::Grouping {
-            expr: expr.as_box(),
-        })
-    }
-
-    /// Create a new variable expression.
-    fn new_variable_assignment(name: &str, expr: Expr) -> Expr {
-        new_expr(ExprData::Assign {
-            name: String::from(name),
-            expr: expr.as_box(),
-        })
+    /// Creates a new variable expression.
+    pub fn new_variable_expr(name: &str) -> Expr {
+        new_expr(ExprData::Variable { name: name.into() })
     }
 }

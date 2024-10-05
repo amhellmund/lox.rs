@@ -196,7 +196,7 @@ impl AstTopologicalSerializer {
                 self.generate_ast_serialization("group", loc, vec![sub_ser.serialize_expr(expr)])
             }
             ExprData::Variable { name } => {
-                self.generate_ast_serialization("var", loc, vec![sub_ser.serialize_name(name)])
+                self.generate_ast_serialization_for_literal("var", loc, Some(name.clone()))
             }
             ExprData::Assign { name, expr } => self.generate_ast_serialization(
                 "assign",
@@ -229,13 +229,15 @@ impl AstTopologicalSerializer {
 mod tests {
     use crate::ast::{
         tests::{
-            new_boolean_literal, new_if_stmt, new_literal_expr, new_number_literal, new_print_stmt,
+            new_assign_expr, new_binary_expr, new_block_stmt, new_boolean_literal_expr,
+            new_expr_stmt, new_if_else_stmt, new_if_stmt, new_literal_expr,
+            new_number_literal_expr, new_print_stmt, new_string_literal_expr, new_variable_expr,
+            new_while_stmt,
         },
-        Literal, Stmt,
+        BinaryOperator, Literal, Stmt,
     };
 
     use super::{AstSerializerOptions, AstTopologicalSerializer};
-    use textwrap::dedent as dedent_core;
 
     use crate::ast::tests::{new_expr, new_var_decl_stmt};
 
@@ -252,7 +254,7 @@ mod tests {
 
     fn dedent(input: &str) -> String {
         // skip the empty lines at the beginning
-        let dedented_input = dedent_core(input);
+        let dedented_input = textwrap::dedent(input);
         let lines: Vec<String> = dedented_input
             .split('\n')
             .skip_while(|line| line.len() == 0)
@@ -265,7 +267,7 @@ mod tests {
     #[test]
     fn test_serialize_var_declaration() {
         test_serialize(
-            new_var_decl_stmt("id", new_number_literal(0)),
+            new_var_decl_stmt("id", new_number_literal_expr(0)),
             dedent(
                 r#"
                 (var-decl
@@ -281,8 +283,8 @@ mod tests {
     fn test_serialize_if_statement() {
         test_serialize(
             new_if_stmt(
-                new_boolean_literal(true),
-                new_print_stmt(new_number_literal(0)),
+                new_boolean_literal_expr(true),
+                new_print_stmt(new_number_literal_expr(0)),
             ),
             dedent(
                 r#"
@@ -295,5 +297,104 @@ mod tests {
                 "#,
             ),
         );
+    }
+
+    #[test]
+    fn test_serialize_if_else_statement() {
+        test_serialize(
+            new_if_else_stmt(
+                new_boolean_literal_expr(false),
+                new_expr_stmt(new_assign_expr("id", new_number_literal_expr(0))),
+                new_print_stmt(new_string_literal_expr("value")),
+            ),
+            dedent(
+                r#"
+                (if
+                  (bool false)
+                  (expr
+                    (assign
+                      id
+                      (number 0)
+                    )
+                  )
+                  (print
+                    (string value)
+                  )
+                )
+                "#,
+            ),
+        );
+    }
+
+    #[test]
+    fn test_while_stmt() {
+        test_serialize(
+            new_while_stmt(
+                new_binary_expr(
+                    BinaryOperator::LessThan,
+                    new_binary_expr(
+                        BinaryOperator::Add,
+                        new_variable_expr("id"),
+                        new_number_literal_expr(1),
+                    ),
+                    new_number_literal_expr(10),
+                ),
+                new_block_stmt(vec![new_expr_stmt(new_assign_expr(
+                    "id",
+                    new_binary_expr(
+                        BinaryOperator::Multiply,
+                        new_variable_expr("id"),
+                        new_number_literal_expr(2),
+                    ),
+                ))]),
+            ),
+            dedent(
+                r#"
+                (while
+                  (<
+                    (+
+                      (var id)
+                      (number 1)
+                    )
+                    (number 10)
+                  )
+                  (block
+                    (expr
+                      (assign
+                        id
+                        (*
+                          (var id)
+                          (number 2)
+                        )
+                      )
+                    )
+                  )
+                )
+                "#,
+            ),
+        );
+    }
+
+    #[test]
+    fn test_binary_expr() {
+        for op in BinaryOperator::iter() {
+            let ast = new_expr_stmt(new_binary_expr(
+                op,
+                new_number_literal_expr(0),
+                new_number_literal_expr(1),
+            ));
+            let expected_output = dedent(&format!(
+                r#"
+                (expr
+                  ({}
+                    (number 0)
+                    (number 1)
+                  )
+                 )
+                "#,
+                op.to_string()
+            ));
+            test_serialize(ast, expected_output);
+        }
     }
 }
