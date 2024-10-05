@@ -15,7 +15,7 @@ use crate::{
 use super::{ExprData, Stmt, StmtData};
 
 #[derive(Clone)]
-pub struct AstSerializerOptions {
+struct AstSerializerOptions {
     /// Include the location information (lines and columns) for statements and expressions.
     include_location: bool,
 }
@@ -50,18 +50,18 @@ struct AstTopologicalSerializer {
 impl AstTopologicalSerializer {
     const INDENT_NEXT_LEVEL: i64 = 2;
 
-    pub fn new(options: AstSerializerOptions, indent: i64) -> Self {
+    fn new(options: AstSerializerOptions, indent: i64) -> Self {
         Self { options, indent }
     }
 
-    pub fn new_inner_serializer(&self) -> Self {
+    fn new_inner_serializer(&self) -> Self {
         Self {
             options: self.options.clone(),
             indent: Self::INDENT_NEXT_LEVEL,
         }
     }
 
-    pub fn serialize(self, stmt: &Stmt) -> String {
+    fn serialize(&self, stmt: &Stmt) -> String {
         self.serialize_stmt(stmt).join("\n")
     }
 
@@ -225,30 +225,28 @@ impl AstTopologicalSerializer {
     }
 }
 
+pub fn serialize(stmt: &Stmt, include_location: bool) -> String {
+    let ser = AstTopologicalSerializer::new(AstSerializerOptions { include_location }, 0);
+    ser.serialize(stmt)
+}
+
 #[cfg(test)]
 mod tests {
     use crate::ast::{
         tests::{
             new_assign_expr, new_binary_expr, new_block_stmt, new_boolean_literal_expr,
-            new_expr_stmt, new_if_else_stmt, new_if_stmt, new_literal_expr,
-            new_number_literal_expr, new_print_stmt, new_string_literal_expr, new_variable_expr,
-            new_while_stmt,
+            new_expr_stmt, new_grouping_expr, new_if_else_stmt, new_if_stmt, new_literal_expr,
+            new_number_literal_expr, new_print_stmt, new_string_literal_expr, new_unary_expr,
+            new_var_decl_stmt, new_variable_expr, new_while_stmt,
         },
-        BinaryOperator, Literal, Stmt,
+        BinaryOperator, Literal, Stmt, UnaryOperator,
     };
+    use strum::IntoEnumIterator;
 
-    use super::{AstSerializerOptions, AstTopologicalSerializer};
-
-    use crate::ast::tests::{new_expr, new_var_decl_stmt};
+    use super::serialize;
 
     fn test_serialize(stmt: Stmt, expected: String) {
-        let ser = AstTopologicalSerializer::new(
-            AstSerializerOptions {
-                include_location: false,
-            },
-            0,
-        );
-        let output = ser.serialize(&stmt);
+        let output = serialize(&stmt, false);
         assert_eq!(output, expected);
     }
 
@@ -265,7 +263,7 @@ mod tests {
     }
 
     #[test]
-    fn test_serialize_var_declaration() {
+    fn test_stmt_var_declaration() {
         test_serialize(
             new_var_decl_stmt("id", new_number_literal_expr(0)),
             dedent(
@@ -280,7 +278,7 @@ mod tests {
     }
 
     #[test]
-    fn test_serialize_if_statement() {
+    fn test_stmt_if() {
         test_serialize(
             new_if_stmt(
                 new_boolean_literal_expr(true),
@@ -300,7 +298,7 @@ mod tests {
     }
 
     #[test]
-    fn test_serialize_if_else_statement() {
+    fn test_stmt_if_else() {
         test_serialize(
             new_if_else_stmt(
                 new_boolean_literal_expr(false),
@@ -327,7 +325,7 @@ mod tests {
     }
 
     #[test]
-    fn test_while_stmt() {
+    fn test_stmt_while() {
         test_serialize(
             new_while_stmt(
                 new_binary_expr(
@@ -376,7 +374,7 @@ mod tests {
     }
 
     #[test]
-    fn test_binary_expr() {
+    fn test_expr_binary() {
         for op in BinaryOperator::iter() {
             let ast = new_expr_stmt(new_binary_expr(
                 op,
@@ -390,11 +388,88 @@ mod tests {
                     (number 0)
                     (number 1)
                   )
-                 )
+                )
                 "#,
                 op.to_string()
             ));
             test_serialize(ast, expected_output);
         }
+    }
+
+    #[test]
+    fn test_expr_unary() {
+        for op in UnaryOperator::iter() {
+            test_serialize(
+                new_expr_stmt(new_unary_expr(op, new_number_literal_expr(0))),
+                dedent(&format!(
+                    r#"
+                    (expr
+                      ({}
+                        (number 0)
+                      )
+                    )
+                    "#,
+                    op.to_string()
+                )),
+            );
+        }
+    }
+
+    #[test]
+    fn test_expr_grouping() {
+        test_serialize(
+            new_expr_stmt(new_grouping_expr(new_binary_expr(
+                BinaryOperator::Add,
+                new_number_literal_expr(0),
+                new_number_literal_expr(1),
+            ))),
+            dedent(
+                r#"
+                (expr
+                  (group
+                    (+
+                      (number 0)
+                      (number 1)
+                    )
+                  )
+                )
+                "#,
+            ),
+        );
+    }
+
+    #[test]
+    fn test_with_locations() {
+        let ast = new_block_stmt(vec![
+            new_var_decl_stmt("id", new_literal_expr(Literal::Nil)),
+            new_expr_stmt(new_assign_expr(
+                "id",
+                new_binary_expr(
+                    BinaryOperator::Divide,
+                    new_number_literal_expr(10),
+                    new_number_literal_expr(5),
+                ),
+            )),
+        ]);
+        let expected_output = dedent(
+            r#"
+            (block [1:1-1:1]
+              (var-decl [1:1-1:1]
+                id
+                (nil) [1:1-1:1]
+              )
+              (expr [1:1-1:1]
+                (assign [1:1-1:1]
+                  id
+                  (/ [1:1-1:1]
+                    (number 10) [1:1-1:1]
+                    (number 5) [1:1-1:1]
+                  )
+                )
+              )
+            )
+            "#,
+        );
+        assert_eq!(serialize(&ast, true), expected_output);
     }
 }

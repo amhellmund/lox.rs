@@ -9,7 +9,7 @@
 
 use anyhow::{Context, Result};
 // use ast::interpreter::{eval_stmt, Evaluator};
-use ast::serializer::AstSerializerOptions;
+use ast::serializer::serialize;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::{fs, io};
@@ -34,8 +34,10 @@ pub fn execute(file_path: &Path, show_ast: bool) -> Result<()> {
         .with_context(|| "Failed to parse the input file")?;
 
     if show_ast {
-        // let ast_as_string = print_ast(&ast);
-        // println!("AST:\n{}", ast_as_string);
+        println!("Abstract Syntax Tree");
+        println!("====================");
+        println!("{}", serialize(&ast, false));
+        println!("====================");
     }
 
     // eval_stmt(&ast, file_path.to_path_buf(), Some(&mut std::io::stdout()))?;

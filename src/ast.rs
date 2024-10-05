@@ -25,8 +25,7 @@
 pub mod serializer;
 
 use crate::diagnostics::LocationSpan;
-use strum::IntoEnumIterator;
-use strum_macros::{EnumIter, EnumMessage};
+use strum_macros::EnumIter;
 
 /// Statements.
 #[derive(PartialEq, Debug)]
@@ -82,7 +81,7 @@ pub enum StmtData {
     },
 }
 
-#[derive(PartialEq, Debug, EnumIter)]
+#[derive(Debug, Clone, Copy, EnumIter, PartialEq)]
 pub enum UnaryOperator {
     Minus,
     Not,
@@ -97,7 +96,7 @@ impl ToString for UnaryOperator {
     }
 }
 
-#[derive(PartialEq, Debug, EnumIter)]
+#[derive(Clone, Copy, Debug, EnumIter, PartialEq)]
 pub enum BinaryOperator {
     Add,
     Substract,
