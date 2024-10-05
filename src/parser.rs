@@ -95,7 +95,7 @@ impl Parser {
     /// the next token.
     ///
     /// In case the current token does not have the specified token, None is returned.
-    pub fn consume_if_has_token_type(&mut self, token_types: &[TokenType]) -> Option<Token> {
+    pub fn consume_if_has_token_types(&mut self, token_types: &[TokenType]) -> Option<Token> {
         let current_token = self.tokens.current();
         if self.tokens.current_has_token_type(token_types) {
             self.tokens.advance();
@@ -103,6 +103,11 @@ impl Parser {
         } else {
             return None;
         }
+    }
+
+    /// Consumes the current token if it has the given token type.
+    pub fn consume_if_has_token_type(&mut self, token_type: TokenType) -> Option<Token> {
+        self.consume_if_has_token_types(&[token_type])
     }
 
     /// Consumes the current token, that is the current token gets returned. Beforehand the position
@@ -140,7 +145,7 @@ impl Parser {
         }
     }
 
-    fn parse(&mut self) -> Result<Stmt> {
+    fn parse(mut self) -> Result<Stmt> {
         Ok(self.parse_program()?)
     }
 
@@ -189,7 +194,7 @@ impl Parser {
         let identifier = self.consume_or_error(TokenType::Identifier)?;
 
         let init_expr;
-        if let Some(_) = self.consume_if_has_token_type(&[TokenType::Equal]) {
+        if let Some(_) = self.consume_if_has_token_type(TokenType::Equal) {
             init_expr = self.parse_expression()?;
         } else {
             // The init expression is set to 'nil' in case there is no initializer.
@@ -315,7 +320,7 @@ impl Parser {
 
         let mut else_statement: Option<Box<Stmt>> = None;
         let mut loc = LocationSpan::new(if_token.location, if_statement.get_loc().end_inclusive);
-        if self.consume_if_has_token_type(&[TokenType::Else]).is_some() {
+        if self.consume_if_has_token_type(TokenType::Else).is_some() {
             else_statement = Some(Box::new(self.parse_statement()?));
             loc.end_inclusive = else_statement.as_ref().unwrap().get_loc().end_inclusive;
         }
@@ -364,7 +369,7 @@ impl Parser {
     ///             | equality
     fn parse_assignment(&mut self) -> Result<Expr> {
         let lvalue_expr = self.parse_equality()?;
-        if let Some(_) = self.consume_if_has_token_type(&[TokenType::Equal]) {
+        if let Some(_) = self.consume_if_has_token_type(TokenType::Equal) {
             let rvalue_expr = self.parse_assignment()?;
 
             if let ExprData::Variable { name, .. } = &lvalue_expr.get_data() {
@@ -406,7 +411,7 @@ impl Parser {
     ) -> Result<Expr> {
         let mut expr = parse_fn(self)?;
 
-        while let Some(token) = self.consume_if_has_token_type(&token_types) {
+        while let Some(token) = self.consume_if_has_token_types(&token_types) {
             let op = get_binary_operator_from_token_type(&token.token_type);
 
             let rhs = parse_fn(self)?;
@@ -480,7 +485,7 @@ impl Parser {
     ///        | primary
     fn parse_unary(&mut self) -> Result<Expr> {
         let token_types = [TokenType::Minus, TokenType::Bang];
-        if let Some(token) = self.consume_if_has_token_type(&token_types) {
+        if let Some(token) = self.consume_if_has_token_types(&token_types) {
             let op = get_unary_operator_from_token_type(&token.token_type);
 
             let expr = self.parse_primary()?;
@@ -547,7 +552,7 @@ impl Parser {
             TokenType::LeftParanthesis => {
                 let expr = self.parse_expression()?;
                 if let Some(closing_token) =
-                    self.consume_if_has_token_type(&[TokenType::RightParanthesis])
+                    self.consume_if_has_token_type(TokenType::RightParanthesis)
                 {
                     return Ok(Expr::new(
                         ExprData::Grouping {
@@ -579,15 +584,32 @@ impl Parser {
     }
 }
 
+/// General Note: the tests for the parsers sub-divide into two categories:
+///
+///   o Full-Feature Tests: The generated AST from a token sequence gets fully tested including
+///      location information (line, column).
+///
+///   o Structural Tests: The generated AST gets tested for structure only with the location information
+///     getting ignored. To ease the testing, the equivalence of two ASTs, i.e. the generated and expected
+///     ones are tested by using the AST `serializer` module.
+///                   
 #[cfg(test)]
 mod tests {
+    use core::panic;
+    use std::path::PathBuf;
+
     use super::Parser;
     use crate::{
-        ast::{BinaryOperator, UnaryOperator},
+        ast::{
+            serializer::tests::serialize_expr,
+            tests::{new_grouping_expr, new_number_literal_expr},
+            BinaryOperator, ExprData, UnaryOperator,
+        },
         diagnostics::{Location, LocationSpan},
         scanner::{Token, TokenType},
     };
     use anyhow::Result;
+    use colored::Colorize;
 
     use crate::ast::{Expr, Literal, Stmt};
 
@@ -614,158 +636,194 @@ mod tests {
         }
     }
 
-    //     pub fn loc_span(start: (i64, i64), end_inclusive: (i64, i64)) -> LocationSpan {
-    //         LocationSpan {
-    //             start: Location::new(start.0, start.1),
-    //             end_inclusive: Location::new(end_inclusive.0, end_inclusive.1),
-    //         }
-    //     }
-
     #[test]
     fn test_build_token_sequence() {
         let tokens = token_seq![TokenType::And, TokenType::Identifier];
         assert_eq!(tokens.len(), 3);
         assert_eq!(
             tokens[0],
-            Token::new(TokenType::And, Location::new(1, 1), "and".into())
+            Token::new(TokenType::And, Location::new(1, 1), String::from("and"))
         );
         assert_eq!(
             tokens[1],
             Token::new(
                 TokenType::Identifier,
                 Location::new(2, 1),
-                "identifier".into()
+                String::from("id")
             )
         );
         assert_eq!(
             tokens[2],
-            Token::new(TokenType::EndOfFile, Location::new(3, 1), "".into())
+            Token::new(TokenType::EndOfFile, Location::new(3, 1), String::default())
         );
     }
 
-    //     fn parse_expr(tokens: Vec<Token>) -> Result<Expr> {
-    //         let mut parser = Parser::new(tokens, "in-memory".into());
-    //         parser.parse_expression()
-    //     }
+    fn new_parser(tokens: Vec<Token>) -> Parser {
+        Parser::new(tokens, PathBuf::from("test"))
+    }
 
     //     fn parse_stmt(tokens: Vec<Token>) -> Result<Stmt> {
     //         let mut parser = Parser::new(tokens, "in-memory".into());
     //         parser.parse_declaration()
     //     }
 
-    //     fn parse_expr_and_check_literal(
-    //         tokens: Vec<Token>,
-    //         expected_literal: Literal,
-    //         expected_end_inclusive_loc: Location,
-    //     ) {
-    //         let ast = parse_expr(tokens);
-    //         assert!(ast.is_ok());
+    ///////////////////////////////////
+    /// Tests for Utility Functions ///
+    ///////////////////////////////////
 
-    //         if let Expr::Literal { literal, loc } = ast.unwrap() {
-    //             assert_eq!(literal, expected_literal);
-    //             assert_eq!(
-    //                 loc,
-    //                 LocationSpan::new(Location::new(1, 1), expected_end_inclusive_loc)
-    //             );
-    //         } else {
-    //             panic!("Invalid expression type returned")
-    //         }
-    //     }
+    #[test]
+    fn test_consume() {
+        let mut parser = new_parser(token_seq!(TokenType::And));
 
-    //     #[test]
-    //     fn test_consume() {
-    //         let tokens = build_token_sequence(vec![TokenType::And]);
-    //         let mut parser = Parser::new(tokens, "in-memory".into());
+        let token = parser.consume();
+        assert_eq!(token.token_type, TokenType::And);
+        assert_eq!(token.location, Location::new(1, 1));
+        assert_eq!(token.lexeme, String::from("and"));
 
-    //         let token = parser.consume();
-    //         assert_eq!(token.token_type, TokenType::And);
-    //         assert_eq!(token.location, Location::new(1, 1));
-    //         assert_eq!(token.lexeme, String::from("and"));
+        let eof = parser.consume();
+        assert_eq!(eof.token_type, TokenType::EndOfFile);
+    }
 
-    //         let eof = parser.consume();
-    //         assert_eq!(eof.token_type, TokenType::EndOfFile);
-    //     }
+    #[test]
+    fn test_consume_if_has_token_type() {
+        let mut parser = new_parser(token_seq!(TokenType::And));
 
-    //     #[test]
-    //     fn test_consume_if_has_token_type() {
-    //         let tokens = build_token_sequence(vec![TokenType::And]);
-    //         let mut parser = Parser::new(tokens, "in-memory".into());
+        assert!(parser.consume_if_has_token_type(TokenType::Bang).is_none());
+        let token = parser
+            .consume_if_has_token_types(&[TokenType::And])
+            .unwrap();
+        assert_eq!(token.token_type, TokenType::And);
+        assert_eq!(token.location, Location::new(1, 1));
+        assert_eq!(token.lexeme, String::from("and"));
+    }
 
-    //         assert!(parser
-    //             .consume_if_has_token_type(&[TokenType::Bang])
-    //             .is_none());
-    //         let token = parser.consume_if_has_token_type(&[TokenType::And]).unwrap();
-    //         assert_eq!(token.token_type, TokenType::And);
-    //         assert_eq!(token.location, Location::new(1, 1));
-    //         assert_eq!(token.lexeme, String::from("and"));
-    //     }
+    #[test]
+    fn test_consume_or_error() {
+        let mut parser = new_parser(token_seq!(TokenType::And));
 
-    //     #[test]
-    //     fn test_consume_or_error() {
-    //         let tokens = build_token_sequence(vec![TokenType::And]);
-    //         let mut parser = Parser::new(tokens, "in-memory".into());
+        let result = parser.consume_or_error(TokenType::Bang);
+        assert!(result.is_err());
 
-    //         let result = parser.consume_or_error(TokenType::Bang);
-    //         assert!(result.is_err());
+        let token = parser.consume_or_error(TokenType::And).unwrap();
+        assert_eq!(token.token_type, TokenType::And);
+        assert_eq!(token.location, Location::new(1, 1));
+        assert_eq!(token.lexeme, String::from("and"));
+    }
 
-    //         let token = parser.consume_or_error(TokenType::And).unwrap();
-    //         assert_eq!(token.token_type, TokenType::And);
-    //         assert_eq!(token.location, Location::new(1, 1));
-    //         assert_eq!(token.lexeme, String::from("and"));
-    //     }
+    ////////////////////////////////////////
+    /// Structural Tests for Expressions ///
+    ////////////////////////////////////////
 
-    //     #[test]
-    //     fn test_primary_expr_from_number() {
-    //         let tokens = build_token_sequence(vec![TokenType::Number]);
-    //         parse_expr_and_check_literal(tokens, Literal::Number(0.0), Location::new(1, 3));
-    //     }
+    fn parse_expr(tokens: Vec<Token>) -> Result<Expr> {
+        let mut parser = new_parser(tokens);
+        parser.parse_expression()
+    }
 
-    //     #[test]
-    //     fn test_primary_expr_from_string() {
-    //         let tokens = build_token_sequence(vec![TokenType::StringLiteral]);
-    //         parse_expr_and_check_literal(
-    //             tokens,
-    //             Literal::String(String::from("string-literal")),
-    //             Location::new(1, 14),
-    //         );
-    //     }
+    fn parse_expr_and_check_literal(tokens: Vec<Token>, expected_literal: Literal) {
+        let ast = parse_expr(tokens);
+        assert!(ast.is_ok());
 
-    //     #[test]
-    //     fn test_primary_expr_from_boolean_true() {
-    //         let tokens = build_token_sequence(vec![TokenType::True]);
-    //         parse_expr_and_check_literal(tokens, Literal::Boolean(true), Location::new(1, 4));
-    //     }
+        if let ExprData::Literal { literal } = ast.unwrap().get_data() {
+            assert_eq!(*literal, expected_literal);
+        } else {
+            panic!("Invalid expression type returned")
+        }
+    }
 
-    //     #[test]
-    //     fn test_primary_expr_from_boolean_false() {
-    //         let tokens = build_token_sequence(vec![TokenType::False]);
-    //         parse_expr_and_check_literal(tokens, Literal::Boolean(false), Location::new(1, 5));
-    //     }
+    fn print_diff(lhs: &Vec<String>, rhs: &Vec<String>) {
+        assert!(lhs.len() > 0);
 
-    //     #[test]
-    //     fn test_primary_expr_from_boolean_nil() {
-    //         let tokens = build_token_sequence(vec![TokenType::Nil]);
-    //         parse_expr_and_check_literal(tokens, Literal::Nil, Location::new(1, 3));
-    //     }
+        const EXTRA_PADDING: usize = 3;
+        // The maximum line length of the `lhs` input is chosen to appropriately pad the `rhs` input.
+        let max_line_length = lhs.iter().map(|line| line.len()).max().unwrap() + EXTRA_PADDING;
+        // Closure to generate the padding
+        let gen_pad = |indent: usize| {
+            std::iter::repeat(" ")
+                .take(indent as usize)
+                .collect::<String>()
+        };
+        // Closure to generate the status of the line comparison
+        let gen_status = |lhs: &str, rhs: &str| {
+            if lhs == rhs {
+                String::from("[O]").green()
+            } else {
+                String::from("[F]").red()
+            }
+        };
+        println!("Diff for AST:");
+        println!("=============");
+        for i in 0..lhs.len() {
+            println!(
+                "[line {:02}]   {}{}{}{}{}",
+                i,
+                lhs[i],
+                gen_pad(max_line_length - lhs[i].len()),
+                gen_status(&lhs[i], &rhs[i]),
+                gen_pad(EXTRA_PADDING),
+                rhs[i],
+            );
+        }
+        println!("=============");
+    }
 
-    //     #[test]
-    //     fn test_grouping_expr() {
-    //         let tokens = build_token_sequence(vec![
-    //             TokenType::LeftParanthesis,
-    //             TokenType::Number,
-    //             TokenType::RightParanthesis,
-    //         ]);
-    //         let expected_ast = Expr::Grouping {
-    //             expr: Box::new(Expr::Literal {
-    //                 literal: Literal::Number(0.0),
-    //                 loc: loc_span((2, 1), (2, 3)),
-    //             }),
-    //             loc: loc_span((1, 1), (3, 1)),
-    //         };
+    fn assert_serialized_output(lhs: Vec<String>, rhs: Vec<String>) {
+        let mut panic_message: Option<String> = None;
+        if lhs.len() != rhs.len() {
+            panic_message = Some(String::from("Lengths of serialized output do not match"));
+        } else {
+            for i in 0..lhs.len() {
+                if lhs[i] != rhs[i] {
+                    panic_message = Some(format!(
+                        "Content of serialized output does not match at line: {}",
+                        i
+                    ));
+                }
+            }
+        }
+        if let Some(message) = panic_message {
+            print_diff(&lhs, &rhs);
+            panic!("Test for serialized output failed: {}", message);
+        }
+    }
 
-    //         let ast = parse_expr(tokens).unwrap();
-    //         assert_eq!(ast, expected_ast);
-    //     }
+    fn parse_expr_and_check(tokens: Vec<Token>, expected_expr_ast: Expr) {
+        let ast = parse_expr(tokens).unwrap();
+
+        let ast_serialized = serialize_expr(&ast);
+        let expected_ast_serialized = serialize_expr(&expected_expr_ast);
+
+        assert_serialized_output(ast_serialized, expected_ast_serialized);
+    }
+
+    #[test]
+    fn test_primary_expr() {
+        let test_data = vec![
+            (token_seq!(TokenType::Number), Literal::Number(1.0)),
+            (
+                token_seq!(TokenType::StringLiteral),
+                Literal::String(String::from("value")),
+            ),
+            (token_seq!(TokenType::True), Literal::Boolean(true)),
+            (token_seq!(TokenType::False), Literal::Boolean(false)),
+            (token_seq!(TokenType::Nil), Literal::Nil),
+        ];
+
+        for (seq, expected) in test_data {
+            parse_expr_and_check_literal(seq, expected);
+        }
+    }
+
+    #[test]
+    fn test_grouping_expr() {
+        parse_expr_and_check(
+            token_seq!(
+                TokenType::LeftParanthesis,
+                TokenType::Number,
+                TokenType::RightParanthesis
+            ),
+            new_grouping_expr(new_number_literal_expr(0)),
+        )
+    }
 
     //     #[test]
     //     fn test_primary_expr_from_identifier() {

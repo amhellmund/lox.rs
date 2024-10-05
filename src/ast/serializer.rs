@@ -262,7 +262,7 @@ impl AstTopologicalSerializer {
 }
 
 #[cfg(test)]
-mod tests {
+pub mod tests {
     use crate::ast::{
         tests::{
             new_assign_expr, new_binary_expr, new_block_stmt, new_boolean_literal_expr,
@@ -270,11 +270,26 @@ mod tests {
             new_number_literal_expr, new_print_stmt, new_string_literal_expr, new_unary_expr,
             new_var_decl_stmt, new_variable_expr, new_while_stmt,
         },
-        BinaryOperator, Literal, Stmt, UnaryOperator,
+        BinaryOperator, Expr, Literal, Stmt, UnaryOperator,
     };
     use strum::IntoEnumIterator;
 
-    use super::serialize;
+    use super::{serialize, AstSerializerOptions, AstTopologicalSerializer};
+
+    /// Serializes an expression to a list of strings with each entry representing one line of the
+    /// serialized output.
+    ///
+    /// Note: this function is used for testing purpose only to show the diff between two serializations
+    /// in a more developer-friendly ways.
+    pub fn serialize_expr(expr: &Expr) -> Vec<String> {
+        let ser = AstTopologicalSerializer::new(
+            AstSerializerOptions {
+                include_location: false,
+            },
+            0,
+        );
+        ser.serialize_expr(expr)
+    }
 
     fn test_serialize(stmt: Stmt, expected: String) {
         let output = serialize(&stmt, false);
