@@ -14,6 +14,15 @@ use crate::{
 
 use super::{ExprData, Stmt, StmtData};
 
+/// Serializes an AST to a string.
+///
+/// The `include_location` parameter controls if location information (line, column) gets printed
+/// for nodes of the AST.
+pub fn serialize(stmt: &Stmt, include_location: bool) -> String {
+    let ser = AstTopologicalSerializer::new(AstSerializerOptions { include_location }, 0);
+    ser.serialize(stmt)
+}
+
 #[derive(Clone)]
 struct AstSerializerOptions {
     /// Include the location information (lines and columns) for statements and expressions.
@@ -61,10 +70,12 @@ impl AstTopologicalSerializer {
         }
     }
 
+    /// Serializes the AST into a string.
     fn serialize(&self, stmt: &Stmt) -> String {
         self.serialize_stmt(stmt).join("\n")
     }
 
+    /// Indents the input by the configured `indent` value.
     fn get_indented(&self, input: String) -> String {
         let indent = std::iter::repeat(" ")
             .take(self.indent as usize)
@@ -72,6 +83,7 @@ impl AstTopologicalSerializer {
         format!("{}{}", indent, input)
     }
 
+    /// Constructs the location-related string dependeing on the `include_location` option.
     fn get_loc_string(&self, loc: &LocationSpan) -> String {
         let mut loc_string = String::new();
         if self.options.include_location {
@@ -80,6 +92,19 @@ impl AstTopologicalSerializer {
         loc_string
     }
 
+    /// Generates a generic output for an AST node based on the (nested) statements.
+    ///
+    /// This function generates this output (the location information `[loc]` is optionally):
+    ///
+    ///   (<tag> [loc]
+    ///     (sub-statement-1
+    ///
+    ///     )
+    ///     ...
+    ///     (sub-statement-N
+    ///
+    ///     )
+    ///   )
     fn generate_ast_serialization(
         &self,
         tag: &str,
@@ -96,6 +121,17 @@ impl AstTopologicalSerializer {
         content
     }
 
+    /// Generates a generic output for an AST literal.
+    ///
+    /// This function generates the output (the location information `loc` is optionally):
+    ///
+    ///   (<tag>) [loc]
+    ///
+    /// in case the value is not provided, or:
+    ///
+    ///   (<tag> <value>) [loc]
+    ///
+    /// otherwise.
     fn generate_ast_serialization_for_literal(
         &self,
         tag: &str,
@@ -223,11 +259,6 @@ impl AstTopologicalSerializer {
     fn serialize_name(&self, name: &str) -> Vec<String> {
         vec![self.get_indented(String::from(name))]
     }
-}
-
-pub fn serialize(stmt: &Stmt, include_location: bool) -> String {
-    let ser = AstTopologicalSerializer::new(AstSerializerOptions { include_location }, 0);
-    ser.serialize(stmt)
 }
 
 #[cfg(test)]
