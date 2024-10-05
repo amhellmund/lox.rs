@@ -579,553 +579,559 @@ impl Parser {
     }
 }
 
-// #[cfg(test)]
-// mod tests {
-//     use super::Parser;
-//     use crate::{
-//         ast::{BinaryOperator, UnaryOperator},
-//         diagnostics::{Location, LocationSpan},
-//         scanner::{Token, TokenType},
-//     };
-//     use anyhow::Result;
+#[cfg(test)]
+mod tests {
+    use super::Parser;
+    use crate::{
+        ast::{BinaryOperator, UnaryOperator},
+        diagnostics::{Location, LocationSpan},
+        scanner::{Token, TokenType},
+    };
+    use anyhow::Result;
 
-//     use crate::ast::{Expr, Literal, Stmt};
+    use crate::ast::{Expr, Literal, Stmt};
 
-//     fn build_token_sequence(token_types: Vec<TokenType>) -> Vec<Token> {
-//         let mut loc = Location::new(1, 1);
-//         let mut tokens = Vec::<Token>::new();
-//         for token_type in token_types {
-//             let lexeme = match token_type {
-//                 TokenType::Number => String::from("0.0"),
-//                 TokenType::Identifier => String::from("identifier"),
-//                 TokenType::StringLiteral => String::from("string-literal"),
-//                 _ => token_type.to_string(),
-//             };
-//             tokens.push(Token::new(token_type, loc, lexeme));
-//             loc.line += 1;
-//         }
-//         tokens.push(Token::new(TokenType::EndOfFile, loc, String::default()));
-//         tokens
-//     }
+    fn build_token_sequence(token_types: Vec<TokenType>) -> Vec<Token> {
+        let mut loc = Location::new(1, 1);
+        let mut tokens = Vec::<Token>::new();
+        for token_type in token_types {
+            let lexeme = match token_type {
+                TokenType::Number => String::from("1.0"),
+                TokenType::Identifier => String::from("id"),
+                TokenType::StringLiteral => String::from("value"),
+                _ => token_type.to_string(),
+            };
+            tokens.push(Token::new(token_type, loc, lexeme));
+            loc.line += 1;
+        }
+        tokens.push(Token::new(TokenType::EndOfFile, loc, String::default()));
+        tokens
+    }
 
-//     pub fn loc_span(start: (i64, i64), end_inclusive: (i64, i64)) -> LocationSpan {
-//         LocationSpan {
-//             start: Location::new(start.0, start.1),
-//             end_inclusive: Location::new(end_inclusive.0, end_inclusive.1),
-//         }
-//     }
+    macro_rules! token_seq {
+        ($($token:expr),*) => {
+            build_token_sequence(vec![$($token),*])
+        }
+    }
 
-//     #[test]
-//     fn test_build_token_sequence() {
-//         let tokens = build_token_sequence(vec![TokenType::And, TokenType::Identifier]);
-//         assert_eq!(tokens.len(), 3);
-//         assert_eq!(
-//             tokens[0],
-//             Token::new(TokenType::And, Location::new(1, 1), "and".into())
-//         );
-//         assert_eq!(
-//             tokens[1],
-//             Token::new(
-//                 TokenType::Identifier,
-//                 Location::new(2, 1),
-//                 "identifier".into()
-//             )
-//         );
-//         assert_eq!(
-//             tokens[2],
-//             Token::new(TokenType::EndOfFile, Location::new(3, 1), "".into())
-//         );
-//     }
+    //     pub fn loc_span(start: (i64, i64), end_inclusive: (i64, i64)) -> LocationSpan {
+    //         LocationSpan {
+    //             start: Location::new(start.0, start.1),
+    //             end_inclusive: Location::new(end_inclusive.0, end_inclusive.1),
+    //         }
+    //     }
 
-//     fn parse_expr(tokens: Vec<Token>) -> Result<Expr> {
-//         let mut parser = Parser::new(tokens, "in-memory".into());
-//         parser.parse_expression()
-//     }
+    #[test]
+    fn test_build_token_sequence() {
+        let tokens = token_seq![TokenType::And, TokenType::Identifier];
+        assert_eq!(tokens.len(), 3);
+        assert_eq!(
+            tokens[0],
+            Token::new(TokenType::And, Location::new(1, 1), "and".into())
+        );
+        assert_eq!(
+            tokens[1],
+            Token::new(
+                TokenType::Identifier,
+                Location::new(2, 1),
+                "identifier".into()
+            )
+        );
+        assert_eq!(
+            tokens[2],
+            Token::new(TokenType::EndOfFile, Location::new(3, 1), "".into())
+        );
+    }
 
-//     fn parse_stmt(tokens: Vec<Token>) -> Result<Stmt> {
-//         let mut parser = Parser::new(tokens, "in-memory".into());
-//         parser.parse_declaration()
-//     }
+    //     fn parse_expr(tokens: Vec<Token>) -> Result<Expr> {
+    //         let mut parser = Parser::new(tokens, "in-memory".into());
+    //         parser.parse_expression()
+    //     }
 
-//     fn parse_expr_and_check_literal(
-//         tokens: Vec<Token>,
-//         expected_literal: Literal,
-//         expected_end_inclusive_loc: Location,
-//     ) {
-//         let ast = parse_expr(tokens);
-//         assert!(ast.is_ok());
+    //     fn parse_stmt(tokens: Vec<Token>) -> Result<Stmt> {
+    //         let mut parser = Parser::new(tokens, "in-memory".into());
+    //         parser.parse_declaration()
+    //     }
 
-//         if let Expr::Literal { literal, loc } = ast.unwrap() {
-//             assert_eq!(literal, expected_literal);
-//             assert_eq!(
-//                 loc,
-//                 LocationSpan::new(Location::new(1, 1), expected_end_inclusive_loc)
-//             );
-//         } else {
-//             panic!("Invalid expression type returned")
-//         }
-//     }
+    //     fn parse_expr_and_check_literal(
+    //         tokens: Vec<Token>,
+    //         expected_literal: Literal,
+    //         expected_end_inclusive_loc: Location,
+    //     ) {
+    //         let ast = parse_expr(tokens);
+    //         assert!(ast.is_ok());
 
-//     #[test]
-//     fn test_consume() {
-//         let tokens = build_token_sequence(vec![TokenType::And]);
-//         let mut parser = Parser::new(tokens, "in-memory".into());
+    //         if let Expr::Literal { literal, loc } = ast.unwrap() {
+    //             assert_eq!(literal, expected_literal);
+    //             assert_eq!(
+    //                 loc,
+    //                 LocationSpan::new(Location::new(1, 1), expected_end_inclusive_loc)
+    //             );
+    //         } else {
+    //             panic!("Invalid expression type returned")
+    //         }
+    //     }
 
-//         let token = parser.consume();
-//         assert_eq!(token.token_type, TokenType::And);
-//         assert_eq!(token.location, Location::new(1, 1));
-//         assert_eq!(token.lexeme, String::from("and"));
+    //     #[test]
+    //     fn test_consume() {
+    //         let tokens = build_token_sequence(vec![TokenType::And]);
+    //         let mut parser = Parser::new(tokens, "in-memory".into());
 
-//         let eof = parser.consume();
-//         assert_eq!(eof.token_type, TokenType::EndOfFile);
-//     }
+    //         let token = parser.consume();
+    //         assert_eq!(token.token_type, TokenType::And);
+    //         assert_eq!(token.location, Location::new(1, 1));
+    //         assert_eq!(token.lexeme, String::from("and"));
 
-//     #[test]
-//     fn test_consume_if_has_token_type() {
-//         let tokens = build_token_sequence(vec![TokenType::And]);
-//         let mut parser = Parser::new(tokens, "in-memory".into());
+    //         let eof = parser.consume();
+    //         assert_eq!(eof.token_type, TokenType::EndOfFile);
+    //     }
 
-//         assert!(parser
-//             .consume_if_has_token_type(&[TokenType::Bang])
-//             .is_none());
-//         let token = parser.consume_if_has_token_type(&[TokenType::And]).unwrap();
-//         assert_eq!(token.token_type, TokenType::And);
-//         assert_eq!(token.location, Location::new(1, 1));
-//         assert_eq!(token.lexeme, String::from("and"));
-//     }
+    //     #[test]
+    //     fn test_consume_if_has_token_type() {
+    //         let tokens = build_token_sequence(vec![TokenType::And]);
+    //         let mut parser = Parser::new(tokens, "in-memory".into());
 
-//     #[test]
-//     fn test_consume_or_error() {
-//         let tokens = build_token_sequence(vec![TokenType::And]);
-//         let mut parser = Parser::new(tokens, "in-memory".into());
+    //         assert!(parser
+    //             .consume_if_has_token_type(&[TokenType::Bang])
+    //             .is_none());
+    //         let token = parser.consume_if_has_token_type(&[TokenType::And]).unwrap();
+    //         assert_eq!(token.token_type, TokenType::And);
+    //         assert_eq!(token.location, Location::new(1, 1));
+    //         assert_eq!(token.lexeme, String::from("and"));
+    //     }
 
-//         let result = parser.consume_or_error(TokenType::Bang);
-//         assert!(result.is_err());
+    //     #[test]
+    //     fn test_consume_or_error() {
+    //         let tokens = build_token_sequence(vec![TokenType::And]);
+    //         let mut parser = Parser::new(tokens, "in-memory".into());
 
-//         let token = parser.consume_or_error(TokenType::And).unwrap();
-//         assert_eq!(token.token_type, TokenType::And);
-//         assert_eq!(token.location, Location::new(1, 1));
-//         assert_eq!(token.lexeme, String::from("and"));
-//     }
+    //         let result = parser.consume_or_error(TokenType::Bang);
+    //         assert!(result.is_err());
 
-//     #[test]
-//     fn test_primary_expr_from_number() {
-//         let tokens = build_token_sequence(vec![TokenType::Number]);
-//         parse_expr_and_check_literal(tokens, Literal::Number(0.0), Location::new(1, 3));
-//     }
+    //         let token = parser.consume_or_error(TokenType::And).unwrap();
+    //         assert_eq!(token.token_type, TokenType::And);
+    //         assert_eq!(token.location, Location::new(1, 1));
+    //         assert_eq!(token.lexeme, String::from("and"));
+    //     }
 
-//     #[test]
-//     fn test_primary_expr_from_string() {
-//         let tokens = build_token_sequence(vec![TokenType::StringLiteral]);
-//         parse_expr_and_check_literal(
-//             tokens,
-//             Literal::String(String::from("string-literal")),
-//             Location::new(1, 14),
-//         );
-//     }
+    //     #[test]
+    //     fn test_primary_expr_from_number() {
+    //         let tokens = build_token_sequence(vec![TokenType::Number]);
+    //         parse_expr_and_check_literal(tokens, Literal::Number(0.0), Location::new(1, 3));
+    //     }
 
-//     #[test]
-//     fn test_primary_expr_from_boolean_true() {
-//         let tokens = build_token_sequence(vec![TokenType::True]);
-//         parse_expr_and_check_literal(tokens, Literal::Boolean(true), Location::new(1, 4));
-//     }
+    //     #[test]
+    //     fn test_primary_expr_from_string() {
+    //         let tokens = build_token_sequence(vec![TokenType::StringLiteral]);
+    //         parse_expr_and_check_literal(
+    //             tokens,
+    //             Literal::String(String::from("string-literal")),
+    //             Location::new(1, 14),
+    //         );
+    //     }
 
-//     #[test]
-//     fn test_primary_expr_from_boolean_false() {
-//         let tokens = build_token_sequence(vec![TokenType::False]);
-//         parse_expr_and_check_literal(tokens, Literal::Boolean(false), Location::new(1, 5));
-//     }
+    //     #[test]
+    //     fn test_primary_expr_from_boolean_true() {
+    //         let tokens = build_token_sequence(vec![TokenType::True]);
+    //         parse_expr_and_check_literal(tokens, Literal::Boolean(true), Location::new(1, 4));
+    //     }
 
-//     #[test]
-//     fn test_primary_expr_from_boolean_nil() {
-//         let tokens = build_token_sequence(vec![TokenType::Nil]);
-//         parse_expr_and_check_literal(tokens, Literal::Nil, Location::new(1, 3));
-//     }
+    //     #[test]
+    //     fn test_primary_expr_from_boolean_false() {
+    //         let tokens = build_token_sequence(vec![TokenType::False]);
+    //         parse_expr_and_check_literal(tokens, Literal::Boolean(false), Location::new(1, 5));
+    //     }
 
-//     #[test]
-//     fn test_grouping_expr() {
-//         let tokens = build_token_sequence(vec![
-//             TokenType::LeftParanthesis,
-//             TokenType::Number,
-//             TokenType::RightParanthesis,
-//         ]);
-//         let expected_ast = Expr::Grouping {
-//             expr: Box::new(Expr::Literal {
-//                 literal: Literal::Number(0.0),
-//                 loc: loc_span((2, 1), (2, 3)),
-//             }),
-//             loc: loc_span((1, 1), (3, 1)),
-//         };
+    //     #[test]
+    //     fn test_primary_expr_from_boolean_nil() {
+    //         let tokens = build_token_sequence(vec![TokenType::Nil]);
+    //         parse_expr_and_check_literal(tokens, Literal::Nil, Location::new(1, 3));
+    //     }
 
-//         let ast = parse_expr(tokens).unwrap();
-//         assert_eq!(ast, expected_ast);
-//     }
+    //     #[test]
+    //     fn test_grouping_expr() {
+    //         let tokens = build_token_sequence(vec![
+    //             TokenType::LeftParanthesis,
+    //             TokenType::Number,
+    //             TokenType::RightParanthesis,
+    //         ]);
+    //         let expected_ast = Expr::Grouping {
+    //             expr: Box::new(Expr::Literal {
+    //                 literal: Literal::Number(0.0),
+    //                 loc: loc_span((2, 1), (2, 3)),
+    //             }),
+    //             loc: loc_span((1, 1), (3, 1)),
+    //         };
 
-//     #[test]
-//     fn test_primary_expr_from_identifier() {
-//         let tokens = build_token_sequence(vec![TokenType::Identifier]);
-//         let expected_ast = Expr::Variable {
-//             name: String::from("identifier"),
-//             loc: loc_span((1, 1), (1, 10)),
-//         };
+    //         let ast = parse_expr(tokens).unwrap();
+    //         assert_eq!(ast, expected_ast);
+    //     }
 
-//         let ast = parse_expr(tokens).unwrap();
-//         assert_eq!(ast, expected_ast);
-//     }
+    //     #[test]
+    //     fn test_primary_expr_from_identifier() {
+    //         let tokens = build_token_sequence(vec![TokenType::Identifier]);
+    //         let expected_ast = Expr::Variable {
+    //             name: String::from("identifier"),
+    //             loc: loc_span((1, 1), (1, 10)),
+    //         };
 
-//     #[test]
-//     fn test_binary_expr() {
-//         let test_data = vec![
-//             (TokenType::Plus, BinaryOperator::Add),
-//             (TokenType::Minus, BinaryOperator::Substract),
-//             (TokenType::Star, BinaryOperator::Multiply),
-//             (TokenType::Slash, BinaryOperator::Divide),
-//             (TokenType::Greater, BinaryOperator::GreaterThan),
-//             (
-//                 TokenType::GreaterOrEqual,
-//                 BinaryOperator::GreaterThanOrEqual,
-//             ),
-//             (TokenType::Less, BinaryOperator::LessThan),
-//             (TokenType::LessOrEqual, BinaryOperator::LessThanOrEqual),
-//             (TokenType::EqualEqual, BinaryOperator::Equal),
-//             (TokenType::BangEqual, BinaryOperator::NotEqual),
-//         ];
-//         for (token_type, binary_op) in test_data {
-//             let tokens =
-//                 build_token_sequence(vec![TokenType::Number, token_type, TokenType::Number]);
-//             let expected_ast = Expr::Binary {
-//                 lhs: Box::new(Expr::Literal {
-//                     literal: Literal::Number(0.0),
-//                     loc: loc_span((1, 1), (1, 3)),
-//                 }),
-//                 op: binary_op,
-//                 rhs: Box::new(Expr::Literal {
-//                     literal: Literal::Number(0.0),
-//                     loc: loc_span((3, 1), (3, 3)),
-//                 }),
-//                 loc: loc_span((1, 1), (3, 3)),
-//             };
-//             let ast = parse_expr(tokens).unwrap();
-//             assert_eq!(ast, expected_ast);
-//         }
-//     }
+    //         let ast = parse_expr(tokens).unwrap();
+    //         assert_eq!(ast, expected_ast);
+    //     }
 
-//     #[test]
-//     fn test_unary_expr() {
-//         let test_data = vec![
-//             (TokenType::Minus, UnaryOperator::Minus),
-//             (TokenType::Bang, UnaryOperator::Not),
-//         ];
-//         for (token_type, unary_op) in test_data {
-//             let tokens = build_token_sequence(vec![token_type, TokenType::Number]);
-//             let expected_ast = Expr::Unary {
-//                 op: unary_op,
-//                 expr: Box::new(Expr::Literal {
-//                     literal: Literal::Number(0.0),
-//                     loc: loc_span((2, 1), (2, 3)),
-//                 }),
-//                 loc: loc_span((1, 1), (2, 3)),
-//             };
-//             let ast: Expr = parse_expr(tokens).unwrap();
-//             assert_eq!(ast, expected_ast);
-//         }
-//     }
+    //     #[test]
+    //     fn test_binary_expr() {
+    //         let test_data = vec![
+    //             (TokenType::Plus, BinaryOperator::Add),
+    //             (TokenType::Minus, BinaryOperator::Substract),
+    //             (TokenType::Star, BinaryOperator::Multiply),
+    //             (TokenType::Slash, BinaryOperator::Divide),
+    //             (TokenType::Greater, BinaryOperator::GreaterThan),
+    //             (
+    //                 TokenType::GreaterOrEqual,
+    //                 BinaryOperator::GreaterThanOrEqual,
+    //             ),
+    //             (TokenType::Less, BinaryOperator::LessThan),
+    //             (TokenType::LessOrEqual, BinaryOperator::LessThanOrEqual),
+    //             (TokenType::EqualEqual, BinaryOperator::Equal),
+    //             (TokenType::BangEqual, BinaryOperator::NotEqual),
+    //         ];
+    //         for (token_type, binary_op) in test_data {
+    //             let tokens =
+    //                 build_token_sequence(vec![TokenType::Number, token_type, TokenType::Number]);
+    //             let expected_ast = Expr::Binary {
+    //                 lhs: Box::new(Expr::Literal {
+    //                     literal: Literal::Number(0.0),
+    //                     loc: loc_span((1, 1), (1, 3)),
+    //                 }),
+    //                 op: binary_op,
+    //                 rhs: Box::new(Expr::Literal {
+    //                     literal: Literal::Number(0.0),
+    //                     loc: loc_span((3, 1), (3, 3)),
+    //                 }),
+    //                 loc: loc_span((1, 1), (3, 3)),
+    //             };
+    //             let ast = parse_expr(tokens).unwrap();
+    //             assert_eq!(ast, expected_ast);
+    //         }
+    //     }
 
-//     #[test]
-//     fn test_assignment() {
-//         let tokens = build_token_sequence(vec![
-//             TokenType::Identifier,
-//             TokenType::Equal,
-//             TokenType::StringLiteral,
-//         ]);
-//         let expected_ast = Expr::Assign {
-//             name: String::from("identifier"),
-//             expr: Box::new(Expr::Literal {
-//                 literal: Literal::String("string-literal".into()),
-//                 loc: loc_span((3, 1), (3, 14)),
-//             }),
-//             loc: loc_span((1, 1), (3, 14)),
-//         };
-//         let ast = parse_expr(tokens).unwrap();
-//         assert_eq!(ast, expected_ast);
-//     }
+    //     #[test]
+    //     fn test_unary_expr() {
+    //         let test_data = vec![
+    //             (TokenType::Minus, UnaryOperator::Minus),
+    //             (TokenType::Bang, UnaryOperator::Not),
+    //         ];
+    //         for (token_type, unary_op) in test_data {
+    //             let tokens = build_token_sequence(vec![token_type, TokenType::Number]);
+    //             let expected_ast = Expr::Unary {
+    //                 op: unary_op,
+    //                 expr: Box::new(Expr::Literal {
+    //                     literal: Literal::Number(0.0),
+    //                     loc: loc_span((2, 1), (2, 3)),
+    //                 }),
+    //                 loc: loc_span((1, 1), (2, 3)),
+    //             };
+    //             let ast: Expr = parse_expr(tokens).unwrap();
+    //             assert_eq!(ast, expected_ast);
+    //         }
+    //     }
 
-//     #[test]
-//     fn test_assignment_error() {
-//         let tokens = build_token_sequence(vec![
-//             TokenType::Identifier,
-//             TokenType::Plus,
-//             TokenType::Number,
-//             TokenType::Equal,
-//             TokenType::StringLiteral,
-//         ]);
-//         assert!(parse_expr(tokens).is_err());
-//     }
+    //     #[test]
+    //     fn test_assignment() {
+    //         let tokens = build_token_sequence(vec![
+    //             TokenType::Identifier,
+    //             TokenType::Equal,
+    //             TokenType::StringLiteral,
+    //         ]);
+    //         let expected_ast = Expr::Assign {
+    //             name: String::from("identifier"),
+    //             expr: Box::new(Expr::Literal {
+    //                 literal: Literal::String("string-literal".into()),
+    //                 loc: loc_span((3, 1), (3, 14)),
+    //             }),
+    //             loc: loc_span((1, 1), (3, 14)),
+    //         };
+    //         let ast = parse_expr(tokens).unwrap();
+    //         assert_eq!(ast, expected_ast);
+    //     }
 
-//     #[test]
-//     fn test_variable_declaration_statement_no_initializer() {
-//         let tokens = build_token_sequence(vec![
-//             TokenType::Var,
-//             TokenType::Identifier,
-//             TokenType::Semicolon,
-//         ]);
-//         let expected_ast = Stmt::VarDecl {
-//             identifier: String::from("identifier"),
-//             init_expr: Box::new(Expr::Literal {
-//                 literal: Literal::Nil,
-//                 loc: loc_span((2, 1), (2, 10)),
-//             }),
-//             loc: loc_span((1, 1), (3, 1)),
-//         };
-//         let ast = parse_stmt(tokens).unwrap();
-//         assert_eq!(ast, expected_ast);
-//     }
+    //     #[test]
+    //     fn test_assignment_error() {
+    //         let tokens = build_token_sequence(vec![
+    //             TokenType::Identifier,
+    //             TokenType::Plus,
+    //             TokenType::Number,
+    //             TokenType::Equal,
+    //             TokenType::StringLiteral,
+    //         ]);
+    //         assert!(parse_expr(tokens).is_err());
+    //     }
 
-//     #[test]
-//     fn test_variable_declaration_statement_with_initializer() {
-//         let tokens = build_token_sequence(vec![
-//             TokenType::Var,
-//             TokenType::Identifier,
-//             TokenType::Equal,
-//             TokenType::Number,
-//             TokenType::Semicolon,
-//         ]);
-//         let expected_ast = Stmt::VarDecl {
-//             identifier: String::from("identifier"),
-//             init_expr: Box::new(Expr::Literal {
-//                 literal: Literal::Number(0.0),
-//                 loc: loc_span((4, 1), (4, 3)),
-//             }),
-//             loc: loc_span((1, 1), (5, 1)),
-//         };
-//         let ast = parse_stmt(tokens).unwrap();
-//         assert_eq!(ast, expected_ast);
-//     }
+    //     #[test]
+    //     fn test_variable_declaration_statement_no_initializer() {
+    //         let tokens = build_token_sequence(vec![
+    //             TokenType::Var,
+    //             TokenType::Identifier,
+    //             TokenType::Semicolon,
+    //         ]);
+    //         let expected_ast = Stmt::VarDecl {
+    //             identifier: String::from("identifier"),
+    //             init_expr: Box::new(Expr::Literal {
+    //                 literal: Literal::Nil,
+    //                 loc: loc_span((2, 1), (2, 10)),
+    //             }),
+    //             loc: loc_span((1, 1), (3, 1)),
+    //         };
+    //         let ast = parse_stmt(tokens).unwrap();
+    //         assert_eq!(ast, expected_ast);
+    //     }
 
-//     #[test]
-//     fn test_variable_declaration_errors() {
-//         let test_data = vec![
-//             build_token_sequence(vec![TokenType::Var, TokenType::Identifier]),
-//             build_token_sequence(vec![
-//                 TokenType::Var,
-//                 TokenType::Identifier,
-//                 TokenType::Equal,
-//                 TokenType::Semicolon,
-//             ]),
-//         ];
-//         for tokens in test_data {
-//             assert!(parse_stmt(tokens).is_err());
-//         }
-//     }
+    //     #[test]
+    //     fn test_variable_declaration_statement_with_initializer() {
+    //         let tokens = build_token_sequence(vec![
+    //             TokenType::Var,
+    //             TokenType::Identifier,
+    //             TokenType::Equal,
+    //             TokenType::Number,
+    //             TokenType::Semicolon,
+    //         ]);
+    //         let expected_ast = Stmt::VarDecl {
+    //             identifier: String::from("identifier"),
+    //             init_expr: Box::new(Expr::Literal {
+    //                 literal: Literal::Number(0.0),
+    //                 loc: loc_span((4, 1), (4, 3)),
+    //             }),
+    //             loc: loc_span((1, 1), (5, 1)),
+    //         };
+    //         let ast = parse_stmt(tokens).unwrap();
+    //         assert_eq!(ast, expected_ast);
+    //     }
 
-//     #[test]
-//     fn test_print_statement() {
-//         let tokens = build_token_sequence(vec![
-//             TokenType::Print,
-//             TokenType::Number,
-//             TokenType::Semicolon,
-//         ]);
-//         let expected_ast = Stmt::Print {
-//             expr: Box::new(Expr::Literal {
-//                 literal: Literal::Number(0.0),
-//                 loc: loc_span((2, 1), (2, 3)),
-//             }),
-//             loc: loc_span((1, 1), (3, 1)),
-//         };
-//         let ast = parse_stmt(tokens).unwrap();
-//         assert_eq!(ast, expected_ast);
-//     }
+    //     #[test]
+    //     fn test_variable_declaration_errors() {
+    //         let test_data = vec![
+    //             build_token_sequence(vec![TokenType::Var, TokenType::Identifier]),
+    //             build_token_sequence(vec![
+    //                 TokenType::Var,
+    //                 TokenType::Identifier,
+    //                 TokenType::Equal,
+    //                 TokenType::Semicolon,
+    //             ]),
+    //         ];
+    //         for tokens in test_data {
+    //             assert!(parse_stmt(tokens).is_err());
+    //         }
+    //     }
 
-//     #[test]
-//     fn test_print_statement_errors() {
-//         let test_data = vec![
-//             build_token_sequence(vec![TokenType::Print, TokenType::Semicolon]),
-//             build_token_sequence(vec![TokenType::Print, TokenType::Number]),
-//         ];
-//         for tokens in test_data {
-//             assert!(parse_stmt(tokens).is_err());
-//         }
-//     }
+    //     #[test]
+    //     fn test_print_statement() {
+    //         let tokens = build_token_sequence(vec![
+    //             TokenType::Print,
+    //             TokenType::Number,
+    //             TokenType::Semicolon,
+    //         ]);
+    //         let expected_ast = Stmt::Print {
+    //             expr: Box::new(Expr::Literal {
+    //                 literal: Literal::Number(0.0),
+    //                 loc: loc_span((2, 1), (2, 3)),
+    //             }),
+    //             loc: loc_span((1, 1), (3, 1)),
+    //         };
+    //         let ast = parse_stmt(tokens).unwrap();
+    //         assert_eq!(ast, expected_ast);
+    //     }
 
-//     #[test]
-//     fn test_expr_statement() {
-//         let tokens = build_token_sequence(vec![TokenType::Number, TokenType::Semicolon]);
-//         let expected_ast = Stmt::Expr {
-//             expr: Box::new(Expr::Literal {
-//                 literal: Literal::Number(0.0),
-//                 loc: loc_span((1, 1), (1, 3)),
-//             }),
-//             loc: loc_span((1, 1), (2, 1)),
-//         };
-//         let ast = parse_stmt(tokens).unwrap();
-//         assert_eq!(ast, expected_ast);
-//     }
+    //     #[test]
+    //     fn test_print_statement_errors() {
+    //         let test_data = vec![
+    //             build_token_sequence(vec![TokenType::Print, TokenType::Semicolon]),
+    //             build_token_sequence(vec![TokenType::Print, TokenType::Number]),
+    //         ];
+    //         for tokens in test_data {
+    //             assert!(parse_stmt(tokens).is_err());
+    //         }
+    //     }
 
-//     #[test]
-//     fn test_block_statement() {
-//         let tokens = build_token_sequence(vec![
-//             TokenType::LeftBrace,
-//             TokenType::Print,
-//             TokenType::Number,
-//             TokenType::Semicolon,
-//             TokenType::RightBrace,
-//         ]);
-//         let expected_ast = Stmt::Block {
-//             statements: vec![Stmt::Print {
-//                 expr: Box::new(Expr::Literal {
-//                     literal: Literal::Number(0.0),
-//                     loc: loc_span((3, 1), (3, 3)),
-//                 }),
-//                 loc: loc_span((2, 1), (4, 1)),
-//             }],
-//             loc: loc_span((1, 1), (5, 1)),
-//         };
-//         let ast = parse_stmt(tokens).unwrap();
-//         assert_eq!(ast, expected_ast);
-//     }
+    //     #[test]
+    //     fn test_expr_statement() {
+    //         let tokens = build_token_sequence(vec![TokenType::Number, TokenType::Semicolon]);
+    //         let expected_ast = Stmt::Expr {
+    //             expr: Box::new(Expr::Literal {
+    //                 literal: Literal::Number(0.0),
+    //                 loc: loc_span((1, 1), (1, 3)),
+    //             }),
+    //             loc: loc_span((1, 1), (2, 1)),
+    //         };
+    //         let ast = parse_stmt(tokens).unwrap();
+    //         assert_eq!(ast, expected_ast);
+    //     }
 
-//     #[test]
-//     fn test_block_statement_with_inner_variable_declaration() {
-//         let tokens = build_token_sequence(vec![
-//             TokenType::LeftBrace,
-//             TokenType::Var,
-//             TokenType::Identifier,
-//             TokenType::Equal,
-//             TokenType::Number,
-//             TokenType::Semicolon,
-//             TokenType::RightBrace,
-//         ]);
-//         let expected_ast = Stmt::Block {
-//             statements: vec![Stmt::VarDecl {
-//                 identifier: String::from("identifier"),
-//                 init_expr: Box::new(Expr::Literal {
-//                     literal: Literal::Number(0.0),
-//                     loc: loc_span((5, 1), (5, 3)),
-//                 }),
-//                 loc: loc_span((2, 1), (6, 1)),
-//             }],
-//             loc: loc_span((1, 1), (7, 1)),
-//         };
-//         let ast = parse_stmt(tokens).unwrap();
-//         assert_eq!(ast, expected_ast);
-//     }
+    //     #[test]
+    //     fn test_block_statement() {
+    //         let tokens = build_token_sequence(vec![
+    //             TokenType::LeftBrace,
+    //             TokenType::Print,
+    //             TokenType::Number,
+    //             TokenType::Semicolon,
+    //             TokenType::RightBrace,
+    //         ]);
+    //         let expected_ast = Stmt::Block {
+    //             statements: vec![Stmt::Print {
+    //                 expr: Box::new(Expr::Literal {
+    //                     literal: Literal::Number(0.0),
+    //                     loc: loc_span((3, 1), (3, 3)),
+    //                 }),
+    //                 loc: loc_span((2, 1), (4, 1)),
+    //             }],
+    //             loc: loc_span((1, 1), (5, 1)),
+    //         };
+    //         let ast = parse_stmt(tokens).unwrap();
+    //         assert_eq!(ast, expected_ast);
+    //     }
 
-//     #[test]
-//     fn test_if_statement_with_if_only() {
-//         let tokens = build_token_sequence(vec![
-//             TokenType::If,
-//             TokenType::LeftParanthesis,
-//             TokenType::Number,
-//             TokenType::RightParanthesis,
-//             TokenType::Identifier,
-//             TokenType::Equal,
-//             TokenType::Number,
-//             TokenType::Semicolon,
-//         ]);
-//         let expected_ast = Stmt::If {
-//             condition: Box::new(Expr::Literal {
-//                 literal: Literal::Number(0.0),
-//                 loc: loc_span((3, 1), (3, 3)),
-//             }),
-//             if_statement: Box::new(Stmt::Expr {
-//                 expr: Box::new(Expr::Assign {
-//                     name: "identifier".into(),
-//                     expr: Box::new(Expr::Literal {
-//                         literal: Literal::Number(0.0),
-//                         loc: loc_span((7, 1), (7, 3)),
-//                     }),
-//                     loc: loc_span((5, 1), (7, 3)),
-//                 }),
-//                 loc: loc_span((5, 1), (8, 1)),
-//             }),
-//             else_statement: None,
-//             loc: loc_span((1, 1), (8, 1)),
-//         };
-//         let ast = parse_stmt(tokens).unwrap();
-//         assert_eq!(ast, expected_ast);
-//     }
+    //     #[test]
+    //     fn test_block_statement_with_inner_variable_declaration() {
+    //         let tokens = build_token_sequence(vec![
+    //             TokenType::LeftBrace,
+    //             TokenType::Var,
+    //             TokenType::Identifier,
+    //             TokenType::Equal,
+    //             TokenType::Number,
+    //             TokenType::Semicolon,
+    //             TokenType::RightBrace,
+    //         ]);
+    //         let expected_ast = Stmt::Block {
+    //             statements: vec![Stmt::VarDecl {
+    //                 identifier: String::from("identifier"),
+    //                 init_expr: Box::new(Expr::Literal {
+    //                     literal: Literal::Number(0.0),
+    //                     loc: loc_span((5, 1), (5, 3)),
+    //                 }),
+    //                 loc: loc_span((2, 1), (6, 1)),
+    //             }],
+    //             loc: loc_span((1, 1), (7, 1)),
+    //         };
+    //         let ast = parse_stmt(tokens).unwrap();
+    //         assert_eq!(ast, expected_ast);
+    //     }
 
-//     #[test]
-//     fn test_if_statement_with_if_and_else() {
-//         let tokens = build_token_sequence(vec![
-//             TokenType::If,
-//             TokenType::LeftParanthesis,
-//             TokenType::Number,
-//             TokenType::RightParanthesis,
-//             TokenType::Identifier,
-//             TokenType::Equal,
-//             TokenType::Number,
-//             TokenType::Semicolon,
-//             TokenType::Else,
-//             TokenType::Identifier,
-//             TokenType::Equal,
-//             TokenType::Nil,
-//             TokenType::Semicolon,
-//         ]);
-//         let expected_ast = Stmt::If {
-//             condition: Box::new(Expr::Literal {
-//                 literal: Literal::Number(0.0),
-//                 loc: loc_span((3, 1), (3, 3)),
-//             }),
-//             if_statement: Box::new(Stmt::Expr {
-//                 expr: Box::new(Expr::Assign {
-//                     name: "identifier".into(),
-//                     expr: Box::new(Expr::Literal {
-//                         literal: Literal::Number(0.0),
-//                         loc: loc_span((7, 1), (7, 3)),
-//                     }),
-//                     loc: loc_span((5, 1), (7, 3)),
-//                 }),
-//                 loc: loc_span((5, 1), (8, 1)),
-//             }),
-//             else_statement: Some(Box::new(Stmt::Expr {
-//                 expr: Box::new(Expr::Assign {
-//                     name: "identifier".into(),
-//                     expr: Box::new(Expr::Literal {
-//                         literal: Literal::Nil,
-//                         loc: loc_span((12, 1), (12, 3)),
-//                     }),
-//                     loc: loc_span((10, 1), (12, 3)),
-//                 }),
-//                 loc: loc_span((10, 1), (13, 1)),
-//             })),
-//             loc: loc_span((1, 1), (13, 1)),
-//         };
-//         let ast = parse_stmt(tokens).unwrap();
-//         assert_eq!(ast, expected_ast);
-//     }
+    //     #[test]
+    //     fn test_if_statement_with_if_only() {
+    //         let tokens = build_token_sequence(vec![
+    //             TokenType::If,
+    //             TokenType::LeftParanthesis,
+    //             TokenType::Number,
+    //             TokenType::RightParanthesis,
+    //             TokenType::Identifier,
+    //             TokenType::Equal,
+    //             TokenType::Number,
+    //             TokenType::Semicolon,
+    //         ]);
+    //         let expected_ast = Stmt::If {
+    //             condition: Box::new(Expr::Literal {
+    //                 literal: Literal::Number(0.0),
+    //                 loc: loc_span((3, 1), (3, 3)),
+    //             }),
+    //             if_statement: Box::new(Stmt::Expr {
+    //                 expr: Box::new(Expr::Assign {
+    //                     name: "identifier".into(),
+    //                     expr: Box::new(Expr::Literal {
+    //                         literal: Literal::Number(0.0),
+    //                         loc: loc_span((7, 1), (7, 3)),
+    //                     }),
+    //                     loc: loc_span((5, 1), (7, 3)),
+    //                 }),
+    //                 loc: loc_span((5, 1), (8, 1)),
+    //             }),
+    //             else_statement: None,
+    //             loc: loc_span((1, 1), (8, 1)),
+    //         };
+    //         let ast = parse_stmt(tokens).unwrap();
+    //         assert_eq!(ast, expected_ast);
+    //     }
 
-//     #[test]
-//     fn test_while_statment() {
-//         let tokens = build_token_sequence(vec![
-//             TokenType::While,
-//             TokenType::LeftParanthesis,
-//             TokenType::Number,
-//             TokenType::RightParanthesis,
-//             TokenType::Identifier,
-//             TokenType::Equal,
-//             TokenType::Number,
-//             TokenType::Semicolon,
-//         ]);
-//         let expected_ast = Stmt::While {
-//             condition: Box::new(Expr::Literal {
-//                 literal: Literal::Number(0.0),
-//                 loc: loc_span((3, 1), (3, 3)),
-//             }),
-//             body: Box::new(Stmt::Expr {
-//                 expr: Box::new(Expr::Assign {
-//                     name: "identifier".into(),
-//                     expr: Box::new(Expr::Literal {
-//                         literal: Literal::Number(0.0),
-//                         loc: loc_span((7, 1), (7, 3)),
-//                     }),
-//                     loc: loc_span((5, 1), (7, 3)),
-//                 }),
-//                 loc: loc_span((5, 1), (8, 1)),
-//             }),
-//             loc: loc_span((1, 1), (8, 1)),
-//         };
-//         let ast = parse_stmt(tokens).unwrap();
-//         assert_eq!(ast, expected_ast);
-//     }
-// }
+    //     #[test]
+    //     fn test_if_statement_with_if_and_else() {
+    //         let tokens = build_token_sequence(vec![
+    //             TokenType::If,
+    //             TokenType::LeftParanthesis,
+    //             TokenType::Number,
+    //             TokenType::RightParanthesis,
+    //             TokenType::Identifier,
+    //             TokenType::Equal,
+    //             TokenType::Number,
+    //             TokenType::Semicolon,
+    //             TokenType::Else,
+    //             TokenType::Identifier,
+    //             TokenType::Equal,
+    //             TokenType::Nil,
+    //             TokenType::Semicolon,
+    //         ]);
+    //         let expected_ast = Stmt::If {
+    //             condition: Box::new(Expr::Literal {
+    //                 literal: Literal::Number(0.0),
+    //                 loc: loc_span((3, 1), (3, 3)),
+    //             }),
+    //             if_statement: Box::new(Stmt::Expr {
+    //                 expr: Box::new(Expr::Assign {
+    //                     name: "identifier".into(),
+    //                     expr: Box::new(Expr::Literal {
+    //                         literal: Literal::Number(0.0),
+    //                         loc: loc_span((7, 1), (7, 3)),
+    //                     }),
+    //                     loc: loc_span((5, 1), (7, 3)),
+    //                 }),
+    //                 loc: loc_span((5, 1), (8, 1)),
+    //             }),
+    //             else_statement: Some(Box::new(Stmt::Expr {
+    //                 expr: Box::new(Expr::Assign {
+    //                     name: "identifier".into(),
+    //                     expr: Box::new(Expr::Literal {
+    //                         literal: Literal::Nil,
+    //                         loc: loc_span((12, 1), (12, 3)),
+    //                     }),
+    //                     loc: loc_span((10, 1), (12, 3)),
+    //                 }),
+    //                 loc: loc_span((10, 1), (13, 1)),
+    //             })),
+    //             loc: loc_span((1, 1), (13, 1)),
+    //         };
+    //         let ast = parse_stmt(tokens).unwrap();
+    //         assert_eq!(ast, expected_ast);
+    //     }
+
+    //     #[test]
+    //     fn test_while_statment() {
+    //         let tokens = build_token_sequence(vec![
+    //             TokenType::While,
+    //             TokenType::LeftParanthesis,
+    //             TokenType::Number,
+    //             TokenType::RightParanthesis,
+    //             TokenType::Identifier,
+    //             TokenType::Equal,
+    //             TokenType::Number,
+    //             TokenType::Semicolon,
+    //         ]);
+    //         let expected_ast = Stmt::While {
+    //             condition: Box::new(Expr::Literal {
+    //                 literal: Literal::Number(0.0),
+    //                 loc: loc_span((3, 1), (3, 3)),
+    //             }),
+    //             body: Box::new(Stmt::Expr {
+    //                 expr: Box::new(Expr::Assign {
+    //                     name: "identifier".into(),
+    //                     expr: Box::new(Expr::Literal {
+    //                         literal: Literal::Number(0.0),
+    //                         loc: loc_span((7, 1), (7, 3)),
+    //                     }),
+    //                     loc: loc_span((5, 1), (7, 3)),
+    //                 }),
+    //                 loc: loc_span((5, 1), (8, 1)),
+    //             }),
+    //             loc: loc_span((1, 1), (8, 1)),
+    //         };
+    //         let ast = parse_stmt(tokens).unwrap();
+    //         assert_eq!(ast, expected_ast);
+    //     }
+}
