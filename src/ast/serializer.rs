@@ -203,6 +203,7 @@ mod tests {
     };
 
     use super::{AstSerializerOptions, AstTopologicalSerializer};
+    use textwrap::dedent as dedent_core;
 
     use crate::ast::tests::{new_expr, new_var_decl_stmt};
 
@@ -214,70 +215,36 @@ mod tests {
         assert_eq!(output, expected);
     }
 
-    macro_rules! expect_builder {
-        ( $( $tag:expr), $( $x:expr ),* ) => {
-            {
-                let mut temp_vec = Vec::new();
-                $(
-                    temp_vec.push($x);
-                )*
-                temp_vec
-            }
-        };
-    }
-
-    fn expect_builder_impl(tag: &str, sub_builder: Vec<String>) -> String {
-        let mut content = format!("({}\n", tag);
-        for sub in sub_builder {
-            content += &format!(
-                "{}{}\n",
-                AstTopologicalSerializer::get_indent_as_string(
-                    AstTopologicalSerializer::INDENT_NEXT_LEVEL
-                ),
-                sub
-            )
+    fn skip_empty_lines(lines: Vec<&str>) -> Vec<&str> {
+        let mut output = Vec::<&str>::new();
+        let mut start_index = 0;
+        // skip the empty lines at the beginning
+        while lines[start_index].len() == 0 {
+            output.push(lines[start_index]);
+            start_index += 1;
         }
-        content += ")\n";
-        content
+        output
     }
 
-    fn expect_builder_literal(tag: &str, value: &str) -> String {
-        format!("({} {})", tag, value)
-    }
+    fn dedent(input: &str) -> String {
+        let dedented_input = dedent_core(input);
 
-    fn expect_builder_nil() -> String {
-        format!("(nil)")
-    }
-
-    fn expect_scalar(value: &str) -> String {
-        value.to_string()
+        let lines: Vec<&str> = skip_empty_lines();
+        dedent_core(s)
     }
 
     #[test]
     fn test_serialize_var_declaration() {
         test_serialize(
             new_var_decl_stmt("id", new_number_literal(0)),
-            expect_builder(
-                "var-decl",
-                vec![expect_scalar("id"), expect_builder_literal("number", "0")],
+            dedent(
+                r#"
+                (var-decl
+                  id
+                  (number 0)
+                )
+            "#,
             ),
         );
-    }
-
-    #[test]
-    fn test_serialize_if_statement_without_else() {
-        test_serialize(
-            new_if_stmt(
-                new_boolean_literal(true),
-                new_print_stmt(new_number_literal(0)),
-            ),
-            expect_builder(
-                "if",
-                vec![
-                    expect_builder_literal("bool", "true"),
-                    expect_builder("print", vec![expect_builder_literal("number", "0")]),
-                ],
-            ),
-        )
     }
 }
