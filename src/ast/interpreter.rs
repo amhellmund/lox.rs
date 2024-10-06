@@ -375,25 +375,16 @@ impl<'a, W: Write> Interpreter<'a, W> {
 
 #[cfg(test)]
 mod tests {
-    use std::fmt::Binary;
     use std::io::{Read, Seek, Write};
 
-    use super::{interpret, ExprValue};
+    use super::ExprValue;
     use crate::ast::interpreter::Interpreter;
     use crate::ast::tests::{
         new_assign_expr, new_binary_expr, new_boolean_literal_expr, new_expr_stmt,
         new_grouping_expr, new_if_stmt, new_list_stmt, new_literal_expr, new_number_literal_expr,
         new_string_literal_expr, new_unary_expr, new_var_decl_stmt, new_variable_expr,
     };
-    use crate::ast::{BinaryOperator, Expr, Literal, Stmt, UnaryOperator};
-    use crate::diagnostics::{Location, LocationSpan};
-
-    fn default_loc_span() -> LocationSpan {
-        LocationSpan {
-            start: Location::new(1, 1),
-            end_inclusive: Location::new(1, 1),
-        }
-    }
+    use crate::ast::{BinaryOperator, Expr, Literal, UnaryOperator};
 
     struct TestCursor {}
 

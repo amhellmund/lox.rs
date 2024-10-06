@@ -248,7 +248,7 @@ impl Parser {
 
         Ok(Stmt::new(
             StmtData::Print {
-                expr: Box::new(expr),
+                expr: expr.as_box(),
             },
             LocationSpan::new(print_token.location, semicolon_token.location),
         ))
@@ -267,7 +267,7 @@ impl Parser {
         let start_loc = expr.get_loc().start;
         Ok(Stmt::new(
             StmtData::Expr {
-                expr: Box::new(expr),
+                expr: expr.as_box(),
             },
             LocationSpan::new(start_loc, semicolon_token.location),
         ))
@@ -314,14 +314,14 @@ impl Parser {
     fn parse_if_statement(&mut self) -> Result<Stmt> {
         let if_token = self.consume_or_error(TokenType::If)?;
         self.consume_or_error(TokenType::LeftParanthesis)?;
-        let condition = Box::new(self.parse_expression()?);
+        let condition = self.parse_expression()?.as_box();
         self.consume_or_error(TokenType::RightParanthesis)?;
-        let if_statement = Box::new(self.parse_statement()?);
+        let if_statement = self.parse_statement()?.as_box();
 
         let mut else_statement: Option<Box<Stmt>> = None;
         let mut loc = LocationSpan::new(if_token.location, if_statement.get_loc().end_inclusive);
         if self.consume_if_has_token_type(TokenType::Else).is_some() {
-            else_statement = Some(Box::new(self.parse_statement()?));
+            else_statement = Some(self.parse_statement()?.as_box());
             loc.end_inclusive = else_statement.as_ref().unwrap().get_loc().end_inclusive;
         }
 
@@ -345,9 +345,9 @@ impl Parser {
     fn parse_while_statement(&mut self) -> Result<Stmt> {
         let while_token = self.consume_or_error(TokenType::While)?;
         self.consume_or_error(TokenType::LeftParanthesis)?;
-        let condition = Box::new(self.parse_expression()?);
+        let condition = self.parse_expression()?.as_box();
         self.consume_or_error(TokenType::RightParanthesis)?;
-        let body = Box::new(self.parse_statement()?);
+        let body = self.parse_statement()?.as_box();
 
         let loc = LocationSpan::new(while_token.location, body.get_loc().end_inclusive);
         Ok(Stmt::new(StmtData::While { condition, body }, loc))
@@ -380,7 +380,7 @@ impl Parser {
                 Ok(Expr::new(
                     ExprData::Assign {
                         name: name.clone(),
-                        expr: Box::new(rvalue_expr),
+                        expr: rvalue_expr.as_box(),
                     },
                     loc,
                 ))
@@ -420,9 +420,9 @@ impl Parser {
             let loc = LocationSpan::new(expr.get_loc().start, rhs.get_loc().end_inclusive);
             expr = Expr::new(
                 ExprData::Binary {
-                    lhs: Box::new(expr),
+                    lhs: expr.as_box(),
                     op,
-                    rhs: Box::new(rhs),
+                    rhs: rhs.as_box(),
                 },
                 loc,
             )
@@ -494,7 +494,7 @@ impl Parser {
             Ok(Expr::new(
                 ExprData::Unary {
                     op,
-                    expr: Box::new(expr),
+                    expr: expr.as_box(),
                 },
                 loc,
             ))
@@ -556,7 +556,7 @@ impl Parser {
                 {
                     return Ok(Expr::new(
                         ExprData::Grouping {
-                            expr: Box::new(expr),
+                            expr: expr.as_box(),
                         },
                         LocationSpan::new(token.location, closing_token.location),
                     ));
