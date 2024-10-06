@@ -217,6 +217,11 @@ pub mod tests {
         }
     }
 
+    /// Creates a new list statement.
+    pub fn new_list_stmt(statements: Vec<Stmt>) -> Stmt {
+        new_stmt(StmtData::List { statements })
+    }
+
     /// Creates a new block statement.
     pub fn new_block_stmt(statements: Vec<Stmt>) -> Stmt {
         new_stmt(StmtData::Block {

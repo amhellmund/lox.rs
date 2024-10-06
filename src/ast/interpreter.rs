@@ -381,9 +381,9 @@ mod tests {
     use super::{interpret, ExprValue};
     use crate::ast::interpreter::Interpreter;
     use crate::ast::tests::{
-        new_assign_expr, new_binary_expr, new_boolean_literal_expr, new_grouping_expr,
-        new_literal_expr, new_number_literal_expr, new_string_literal_expr, new_unary_expr,
-        new_var_decl_stmt,
+        new_assign_expr, new_binary_expr, new_boolean_literal_expr, new_expr_stmt,
+        new_grouping_expr, new_if_stmt, new_list_stmt, new_literal_expr, new_number_literal_expr,
+        new_string_literal_expr, new_unary_expr, new_var_decl_stmt, new_variable_expr,
     };
     use crate::ast::{BinaryOperator, Expr, Literal, Stmt, UnaryOperator};
     use crate::diagnostics::{Location, LocationSpan};
@@ -738,94 +738,63 @@ mod tests {
     //     assert_eq!(captured_output, String::from("3"));
     // }
 
-    // #[test]
-    // fn test_eval_variable_declaration() {
-    //     let ast = Stmt::VarDecl {
-    //         identifier: "name".into(),
-    //         init_expr: Box::new(new_literal_expr(Literal::Number(2.0))),
-    //         loc: default_loc_span(),
-    //     };
-    //     let mut evaluator = new_test_evaluator();
-    //     evaluator.eval(&ast).unwrap();
+    macro_rules! interpret_stmt_and_check_var_value {
+        ($ast:expr, $target_var:expr, $target_value:expr) => {
+            interpret_stmt_and_check_var_value!($ast, vec![], $target_var, $target_value)
+        };
+        ($ast:expr, $vars:expr, $target_var:expr, $target_value:expr) => {
+            let mut interpreter = new_test_interpreter_with_variables($vars);
+            interpreter.interpret(&$ast).unwrap();
+            assert_eq!(
+                interpreter.env.get_variable($target_var).unwrap(),
+                $target_value
+            )
+        };
+    }
 
-    //     assert_eq!(
-    //         evaluator.env.get_variable("name").unwrap(),
-    //         ExprValue::Number(2.0)
-    //     );
-    // }
+    #[test]
+    fn test_eval_variable_declaration() {
+        interpret_stmt_and_check_var_value!(
+            new_var_decl_stmt("id", new_number_literal_expr(2)),
+            "id",
+            ExprValue::Number(2.0)
+        );
+    }
 
-    // #[test]
-    // fn test_eval_variable_usage() {
-    //     let ast = Stmt::List {
-    //         statements: vec![
-    //             Stmt::VarDecl {
-    //                 identifier: "name".into(),
-    //                 init_expr: Box::new(new_literal_expr(Literal::Number(2.0))),
-    //                 loc: default_loc_span(),
-    //             },
-    //             Stmt::VarDecl {
-    //                 identifier: "name_copied".into(),
-    //                 init_expr: Box::new(Expr::Variable {
-    //                     name: "name".into(),
-    //                     loc: default_loc_span(),
-    //                 }),
-    //                 loc: default_loc_span(),
-    //             },
-    //         ],
-    //         loc: default_loc_span(),
-    //     };
+    #[test]
+    fn test_eval_variable_usage() {
+        interpret_stmt_and_check_var_value!(
+            new_list_stmt(vec![
+                new_var_decl_stmt("id", new_number_literal_expr(2)),
+                new_var_decl_stmt("id_copied", new_variable_expr("id"))
+            ]),
+            "id_copied",
+            ExprValue::Number(2.0)
+        );
+    }
 
-    //     let mut evaluator = new_test_evaluator();
-    //     evaluator.eval(&ast).unwrap();
+    #[test]
+    fn test_eval_expression_statement() {
+        interpret_stmt_and_check_var_value!(
+            new_expr_stmt(new_assign_expr("id", new_string_literal_expr("value"))),
+            vec![("id", ExprValue::Nil)],
+            "id",
+            ExprValue::String(String::from("value"))
+        );
+    }
 
-    //     assert_eq!(
-    //         evaluator.env.get_variable("name_copied").unwrap(),
-    //         ExprValue::Number(2.0)
-    //     );
-    // }
-
-    // #[test]
-    // fn test_eval_expression_statement() {
-    //     let ast = Stmt::Expr {
-    //         expr: Box::new(new_variable_assignment(
-    //             "name",
-    //             new_literal_expr(Literal::String("string".into())),
-    //         )),
-    //         loc: default_loc_span(),
-    //     };
-    //     let mut evaluator = new_test_evaluator();
-    //     evaluator.env.define_variable("name", ExprValue::Nil);
-    //     evaluator.eval(&ast).unwrap();
-
-    //     assert_eq!(
-    //         evaluator.env.get_variable("name").unwrap(),
-    //         ExprValue::String("string".into())
-    //     );
-    // }
-
-    // #[test]
-    // fn test_eval_if_statement() {
-    //     let ast = Stmt::If {
-    //         condition: Box::new(new_literal_expr(Literal::Number(1.0))),
-    //         if_statement: Box::new(Stmt::Expr {
-    //             expr: Box::new(new_variable_assignment(
-    //                 "name",
-    //                 new_literal_expr(Literal::String("string".into())),
-    //             )),
-    //             loc: default_loc_span(),
-    //         }),
-    //         else_statement: None,
-    //         loc: default_loc_span(),
-    //     };
-    //     let mut evaluator = new_test_evaluator();
-    //     evaluator.env.define_variable("name", ExprValue::Nil);
-    //     evaluator.eval(&ast).unwrap();
-
-    //     assert_eq!(
-    //         evaluator.env.get_variable("name").unwrap(),
-    //         ExprValue::String("string".into())
-    //     );
-    // }
+    #[test]
+    fn test_eval_if_statement() {
+        interpret_stmt_and_check_var_value!(
+            new_if_stmt(
+                new_number_literal_expr(1),
+                new_expr_stmt(new_assign_expr("id", new_string_literal_expr("value")))
+            ),
+            vec![("id", ExprValue::Nil)],
+            "id",
+            ExprValue::String(String::from("value"))
+        );
+    }
 
     // #[test]
     // fn test_eval_if_else_statement() {
