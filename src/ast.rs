@@ -201,20 +201,6 @@ pub mod tests {
 
     use super::{BinaryOperator, Expr, ExprData, Literal, Stmt, StmtData, UnaryOperator};
 
-    /// Compares two statements for equality without into account the 'data' field only.
-    ///
-    /// This function may be used when the location information is irrelevant for a test case.
-    pub fn compare_stmt_equal_data(lhs: &Stmt, rhs: &Stmt) -> bool {
-        lhs.data == rhs.data
-    }
-
-    /// Compares two expressions for eqaulity taking into account the data only.
-    ///
-    /// This function may be used when the location information is irrelevant for a test case.
-    pub fn compare_expr_equal_data(lhs: &Expr, rhs: &Expr) -> bool {
-        lhs.data == rhs.data
-    }
-
     /// Creates a default location span for testing purpose.
     pub fn default_loc_span() -> LocationSpan {
         LocationSpan {

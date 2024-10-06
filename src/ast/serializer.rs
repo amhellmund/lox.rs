@@ -291,6 +291,21 @@ pub mod tests {
         ser.serialize_expr(expr)
     }
 
+    /// Serializes a statement to a list of strings with each entry representing one line of the
+    /// serialized output.
+    ///
+    /// Note: this function is used for testing purpose only to show the diff between two serializations
+    /// in a more developer-friendly ways.
+    pub fn serialize_stmt(stmt: &Stmt) -> Vec<String> {
+        let ser = AstTopologicalSerializer::new(
+            AstSerializerOptions {
+                include_location: false,
+            },
+            0,
+        );
+        ser.serialize_stmt(stmt)
+    }
+
     fn test_serialize(stmt: Stmt, expected: String) {
         let output = serialize(&stmt, false);
         assert_eq!(output, expected);
