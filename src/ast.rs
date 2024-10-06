@@ -21,7 +21,7 @@
 //!         < 4 >
 //!         < 1 >
 
-// pub mod interpreter;
+pub mod interpreter;
 pub mod serializer;
 
 use crate::diagnostics::LocationSpan;
@@ -227,15 +227,15 @@ pub mod tests {
     /// Creates a new expression statement.
     pub fn new_expr_stmt(expr: Expr) -> Stmt {
         new_stmt(StmtData::Expr {
-            expr: Box::new(expr),
+            expr: expr.as_box(),
         })
     }
 
     /// Creates a new if-else statement.
     pub fn new_if_stmt(condition: Expr, if_stmt: Stmt) -> Stmt {
         new_stmt(StmtData::If {
-            condition: Box::new(condition),
-            if_statement: Box::new(if_stmt),
+            condition: condition.as_box(),
+            if_statement: if_stmt.as_box(),
             else_statement: None,
         })
     }
@@ -243,16 +243,16 @@ pub mod tests {
     /// Creates a new if-else statement.
     pub fn new_if_else_stmt(condition: Expr, if_stmt: Stmt, else_stmt: Stmt) -> Stmt {
         new_stmt(StmtData::If {
-            condition: Box::new(condition),
-            if_statement: Box::new(if_stmt),
-            else_statement: Some(Box::new(else_stmt)),
+            condition: condition.as_box(),
+            if_statement: if_stmt.as_box(),
+            else_statement: Some(else_stmt.as_box()),
         })
     }
 
     /// Creates a new print statement.
     pub fn new_print_stmt(expr: Expr) -> Stmt {
         new_stmt(StmtData::Print {
-            expr: Box::new(expr),
+            expr: expr.as_box(),
         })
     }
 
@@ -260,15 +260,15 @@ pub mod tests {
     pub fn new_var_decl_stmt(identifier: &str, init_expr: Expr) -> Stmt {
         new_stmt(StmtData::VarDecl {
             identifier: identifier.to_string(),
-            init_expr: Box::new(init_expr),
+            init_expr: init_expr.as_box(),
         })
     }
 
     /// Creates a new while statement.
     pub fn new_while_stmt(condition: Expr, body: Stmt) -> Stmt {
         new_stmt(StmtData::While {
-            condition: Box::new(condition),
-            body: Box::new(body),
+            condition: condition.as_box(),
+            body: body.as_box(),
         })
     }
 
@@ -284,7 +284,7 @@ pub mod tests {
     pub fn new_assign_expr(name: &str, rvalue: Expr) -> Expr {
         new_expr(ExprData::Assign {
             name: name.into(),
-            expr: Box::new(rvalue),
+            expr: rvalue.as_box(),
         })
     }
 

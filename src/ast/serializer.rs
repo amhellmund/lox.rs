@@ -96,6 +96,7 @@ impl AstTopologicalSerializer {
     ///
     /// This function generates this output (the location information `[loc]` is optionally):
     ///
+    /// ```text
     ///   (<tag> [loc]
     ///     (sub-statement-1
     ///
@@ -105,6 +106,7 @@ impl AstTopologicalSerializer {
     ///
     ///     )
     ///   )
+    /// ```
     fn generate_ast_serialization(
         &self,
         tag: &str,
@@ -125,11 +127,15 @@ impl AstTopologicalSerializer {
     ///
     /// This function generates the output (the location information `loc` is optionally):
     ///
+    /// ```text
     ///   (<tag>) [loc]
+    /// ```
     ///
     /// in case the value is not provided, or:
     ///
+    /// ```text
     ///   (<tag> <value>) [loc]
+    /// ```
     ///
     /// otherwise.
     fn generate_ast_serialization_for_literal(

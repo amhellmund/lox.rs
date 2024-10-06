@@ -123,7 +123,7 @@ impl ExecutionEnvironment {
 #[cfg(test)]
 mod tests {
     use super::ExecutionEnvironment;
-    use crate::ast::eval::ExprValue;
+    use crate::ast::interpreter::ExprValue;
 
     #[test]
     fn test_add_read_variable() {
