@@ -312,9 +312,11 @@ pub mod tests {
         ser.serialize_stmt(stmt)
     }
 
-    fn test_serialize(stmt: Stmt, expected: String) {
-        let output = serialize(&stmt, false);
-        assert_eq!(output, expected);
+    macro_rules! assert_serialized {
+        ($stmt:expr, $expected:expr) => {
+            let output = serialize(&$stmt, false);
+            assert_eq!(output, $expected);
+        };
     }
 
     fn dedent(input: &str) -> String {
@@ -331,7 +333,7 @@ pub mod tests {
 
     #[test]
     fn test_stmt_var_declaration() {
-        test_serialize(
+        assert_serialized!(
             new_var_decl_stmt("id", new_number_literal_expr(0)),
             dedent(
                 r#"
@@ -340,13 +342,13 @@ pub mod tests {
                   (number 0)
                 )
             "#,
-            ),
+            )
         );
     }
 
     #[test]
     fn test_stmt_if() {
-        test_serialize(
+        assert_serialized!(
             new_if_stmt(
                 new_boolean_literal_expr(true),
                 new_print_stmt(new_number_literal_expr(0)),
@@ -360,13 +362,13 @@ pub mod tests {
                   )
                 )
                 "#,
-            ),
+            )
         );
     }
 
     #[test]
     fn test_stmt_if_else() {
-        test_serialize(
+        assert_serialized!(
             new_if_else_stmt(
                 new_boolean_literal_expr(false),
                 new_expr_stmt(new_assign_expr("id", new_number_literal_expr(0))),
@@ -387,13 +389,13 @@ pub mod tests {
                   )
                 )
                 "#,
-            ),
+            )
         );
     }
 
     #[test]
     fn test_stmt_while() {
-        test_serialize(
+        assert_serialized!(
             new_while_stmt(
                 new_binary_expr(
                     BinaryOperator::LessThan,
@@ -436,7 +438,7 @@ pub mod tests {
                   )
                 )
                 "#,
-            ),
+            )
         );
     }
 
@@ -459,14 +461,14 @@ pub mod tests {
                 "#,
                 op.to_string()
             ));
-            test_serialize(ast, expected_output);
+            assert_serialized!(ast, expected_output);
         }
     }
 
     #[test]
     fn test_expr_unary() {
         for op in UnaryOperator::iter() {
-            test_serialize(
+            assert_serialized!(
                 new_expr_stmt(new_unary_expr(op, new_number_literal_expr(0))),
                 dedent(&format!(
                     r#"
@@ -477,14 +479,14 @@ pub mod tests {
                     )
                     "#,
                     op.to_string()
-                )),
+                ))
             );
         }
     }
 
     #[test]
     fn test_expr_grouping() {
-        test_serialize(
+        assert_serialized!(
             new_expr_stmt(new_grouping_expr(new_binary_expr(
                 BinaryOperator::Add,
                 new_number_literal_expr(0),
@@ -501,7 +503,7 @@ pub mod tests {
                   )
                 )
                 "#,
-            ),
+            )
         );
     }
 

@@ -376,13 +376,15 @@ impl<'a, W: Write> Interpreter<'a, W> {
 #[cfg(test)]
 mod tests {
     use std::io::{Read, Seek, Write};
+    use std::path::PathBuf;
 
     use super::ExprValue;
-    use crate::ast::interpreter::Interpreter;
+    use crate::ast::interpreter::{interpret, Interpreter};
     use crate::ast::tests::{
         new_assign_expr, new_binary_expr, new_boolean_literal_expr, new_expr_stmt,
-        new_grouping_expr, new_if_stmt, new_list_stmt, new_literal_expr, new_number_literal_expr,
-        new_string_literal_expr, new_unary_expr, new_var_decl_stmt, new_variable_expr,
+        new_grouping_expr, new_if_else_stmt, new_if_stmt, new_list_stmt, new_literal_expr,
+        new_number_literal_expr, new_print_stmt, new_string_literal_expr, new_unary_expr,
+        new_var_decl_stmt, new_variable_expr, new_while_stmt,
     };
     use crate::ast::{BinaryOperator, Expr, Literal, UnaryOperator};
 
@@ -439,7 +441,7 @@ mod tests {
     }
 
     #[test]
-    fn test_eval_from_literal_ast() {
+    fn test_literal() {
         let test_data = vec![
             (new_number_literal_expr(10.0), ExprValue::Number(10.0)),
             (
@@ -478,7 +480,7 @@ mod tests {
     }
 
     #[test]
-    fn test_eval_binary_operator() {
+    fn test_binary_operator() {
         let test_data = vec![
             (
                 new_binary_expr_from_numbers(BinaryOperator::Add, 10, 20),
@@ -554,7 +556,7 @@ mod tests {
     }
 
     #[test]
-    fn test_eval_unary_operator() {
+    fn test_unary_operator() {
         let test_data = vec![
             (
                 new_unary_expr(UnaryOperator::Minus, new_number_literal_expr(1)),
@@ -578,7 +580,7 @@ mod tests {
     }
 
     #[test]
-    fn test_eval_grouping_expr() {
+    fn test_grouping_expr() {
         let test_data = vec![(
             new_grouping_expr(new_number_literal_expr(10)),
             ExprValue::Number(10.0),
@@ -588,7 +590,7 @@ mod tests {
     }
 
     #[test]
-    fn test_eval_complex_ast() {
+    fn test_interpret_complex_ast() {
         let test_data = vec![
             (
                 new_binary_expr(
@@ -627,7 +629,7 @@ mod tests {
     }
 
     #[test]
-    fn test_eval_with_errors() {
+    fn test_interpret_with_errors() {
         let test_data = vec![
             (
                 new_binary_expr(
@@ -675,7 +677,7 @@ mod tests {
     }
 
     #[test]
-    fn test_eval_assignment_single() {
+    fn test_assignment_single() {
         let mut interpreter =
             new_test_interpreter_with_variables(vec![("id", ExprValue::Number(1.0))]);
         let ast = new_assign_expr("id", new_number_literal_expr(10));
@@ -684,7 +686,7 @@ mod tests {
     }
 
     #[test]
-    fn test_eval_assignment_single_in_lexical_scope() {
+    fn test_assignment_single_in_lexical_scope() {
         let ast = new_assign_expr("id", new_number_literal_expr(10));
         let mut interpreter =
             new_test_interpreter_with_variables(vec![("id", ExprValue::Number(1.0))]);
@@ -695,7 +697,7 @@ mod tests {
     }
 
     #[test]
-    fn test_eval_assignment_nested() {
+    fn test_assignment_nested() {
         let ast = new_assign_expr("id", new_assign_expr("id1", new_boolean_literal_expr(true)));
         let mut interpreter = new_test_interpreter_with_variables(vec![
             ("id", ExprValue::Boolean(true)),
@@ -705,29 +707,24 @@ mod tests {
         assert_eq!(value, ExprValue::Boolean(true));
     }
 
-    // fn run_eval_stmt_with_capture_output(stmt: &Stmt) -> String {
-    //     let mut output_writer = std::io::Cursor::new(Vec::<u8>::new());
-    //     eval_stmt(&stmt, "in-memory".into(), Some(&mut output_writer)).unwrap();
-    //     output_writer.seek(std::io::SeekFrom::Start(0)).unwrap();
-    //     let mut string_output = String::new();
-    //     let _ = output_writer.read_to_string(&mut string_output);
-    //     let trimmed_output = String::from(string_output.trim_end());
-    //     trimmed_output
-    // }
+    #[test]
+    fn test_eval_print_statement() {
+        let ast = new_print_stmt(new_binary_expr(
+            BinaryOperator::Add,
+            new_number_literal_expr(1),
+            new_number_literal_expr(2),
+        ));
+        let mut output_writer = std::io::Cursor::new(Vec::<u8>::new());
+        interpret(&ast, PathBuf::from("in-memory"), Some(&mut output_writer)).unwrap();
 
-    // #[test]
-    // fn test_eval_print_statement() {
-    //     let ast = Stmt::Print {
-    //         expr: Box::new(new_binary_expr(
-    //             BinaryOperator::Add,
-    //             new_literal_expr(Literal::Number(1.0)),
-    //             new_literal_expr(Literal::Number(2.0)),
-    //         )),
-    //         loc: default_loc_span(),
-    //     };
-    //     let captured_output = run_eval_stmt_with_capture_output(&ast);
-    //     assert_eq!(captured_output, String::from("3"));
-    // }
+        // read the content from the output writer and trim the ending whitespaces
+        output_writer.seek(std::io::SeekFrom::Start(0)).unwrap();
+        let mut string_output = String::new();
+        let _ = output_writer.read_to_string(&mut string_output);
+        let captured_output = String::from(string_output.trim_end());
+
+        assert_eq!(captured_output, String::from("3"));
+    }
 
     macro_rules! interpret_stmt_and_check_var_value {
         ($ast:expr, $target_var:expr, $target_value:expr) => {
@@ -744,7 +741,7 @@ mod tests {
     }
 
     #[test]
-    fn test_eval_variable_declaration() {
+    fn test_variable_declaration() {
         interpret_stmt_and_check_var_value!(
             new_var_decl_stmt("id", new_number_literal_expr(2)),
             "id",
@@ -753,7 +750,7 @@ mod tests {
     }
 
     #[test]
-    fn test_eval_variable_usage() {
+    fn test_variable_usage() {
         interpret_stmt_and_check_var_value!(
             new_list_stmt(vec![
                 new_var_decl_stmt("id", new_number_literal_expr(2)),
@@ -765,7 +762,7 @@ mod tests {
     }
 
     #[test]
-    fn test_eval_expression_statement() {
+    fn test_expression_statement() {
         interpret_stmt_and_check_var_value!(
             new_expr_stmt(new_assign_expr("id", new_string_literal_expr("value"))),
             vec![("id", ExprValue::Nil)],
@@ -775,7 +772,7 @@ mod tests {
     }
 
     #[test]
-    fn test_eval_if_statement() {
+    fn test_if_statement() {
         interpret_stmt_and_check_var_value!(
             new_if_stmt(
                 new_number_literal_expr(1),
@@ -787,75 +784,41 @@ mod tests {
         );
     }
 
-    // #[test]
-    // fn test_eval_if_else_statement() {
-    //     let ast = Stmt::If {
-    //         condition: Box::new(new_literal_expr(Literal::Boolean(false))),
-    //         if_statement: Box::new(Stmt::Expr {
-    //             expr: Box::new(new_variable_assignment(
-    //                 "name",
-    //                 new_literal_expr(Literal::String("string".into())),
-    //             )),
-    //             loc: default_loc_span(),
-    //         }),
-    //         else_statement: Some(Box::new(Stmt::Expr {
-    //             expr: Box::new(new_variable_assignment(
-    //                 "name",
-    //                 new_literal_expr(Literal::Number(10.0)),
-    //             )),
-    //             loc: default_loc_span(),
-    //         })),
-    //         loc: default_loc_span(),
-    //     };
-    //     let mut evaluator = new_test_evaluator();
-    //     evaluator.env.define_variable("name", ExprValue::Nil);
-    //     evaluator.eval(&ast).unwrap();
+    #[test]
+    fn test_if_else_statement() {
+        interpret_stmt_and_check_var_value!(
+            new_if_else_stmt(
+                new_boolean_literal_expr(false),
+                new_expr_stmt(new_assign_expr("id", new_string_literal_expr("value"))),
+                new_expr_stmt(new_assign_expr("id", new_number_literal_expr(10)))
+            ),
+            vec![("id", ExprValue::Nil)],
+            "id",
+            ExprValue::Number(10.0)
+        );
+    }
 
-    //     assert_eq!(
-    //         evaluator.env.get_variable("name").unwrap(),
-    //         ExprValue::Number(10.0)
-    //     );
-    // }
-
-    // #[test]
-    // fn test_eval_while_statement() {
-    //     let ast = Stmt::While {
-    //         condition: Box::new(new_binary_expr(
-    //             BinaryOperator::LessThan,
-    //             Expr::Variable {
-    //                 name: "name".into(),
-    //                 loc: default_loc_span(),
-    //             },
-    //             new_literal_expr(Literal::Number(10.0)),
-    //         )),
-    //         body: Box::new(Stmt::Expr {
-    //             expr: Box::new(new_variable_assignment(
-    //                 "name",
-    //                 new_binary_expr(
-    //                     BinaryOperator::Add,
-    //                     Expr::Variable {
-    //                         name: "name".into(),
-    //                         loc: default_loc_span(),
-    //                     },
-    //                     Expr::Literal {
-    //                         literal: Literal::Number(1.0),
-    //                         loc: default_loc_span(),
-    //                     },
-    //                 ),
-    //             )),
-    //             loc: default_loc_span(),
-    //         }),
-    //         loc: default_loc_span(),
-    //     };
-    //     let mut evaluator = new_test_evaluator();
-    //     evaluator
-    //         .env
-    //         .define_variable("name", ExprValue::Number(0.0));
-    //     evaluator.eval(&ast).unwrap();
-
-    //     assert_eq!(
-    //         evaluator.env.get_variable("name").unwrap(),
-    //         ExprValue::Number(10.0)
-    //     );
-    // }
+    #[test]
+    fn test_while_statement() {
+        interpret_stmt_and_check_var_value!(
+            new_while_stmt(
+                new_binary_expr(
+                    BinaryOperator::LessThan,
+                    new_variable_expr("id"),
+                    new_number_literal_expr(10)
+                ),
+                new_expr_stmt(new_assign_expr(
+                    "id",
+                    new_binary_expr(
+                        BinaryOperator::Add,
+                        new_variable_expr("id"),
+                        new_number_literal_expr(1)
+                    )
+                ))
+            ),
+            vec![("id", ExprValue::Number(0.0))],
+            "id",
+            ExprValue::Number(10.0)
+        );
+    }
 }

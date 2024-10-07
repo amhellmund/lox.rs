@@ -344,14 +344,16 @@ mod tests {
         Location { line, column }
     }
 
-    fn assert_tokens(input: &str, expected_tokens: Vec<Token>) {
-        let tokens = tokenize(input, PathBuf::from_str("in-memory").unwrap()).unwrap();
-        // the last token by definition is end-of-file (which is not included in the explicitly expected tokens)
-        assert_eq!(tokens.len(), expected_tokens.len() + 1);
-        assert_eq!(tokens[tokens.len() - 1].token_type, TokenType::EndOfFile);
-        for (index, token) in tokens.iter().take(expected_tokens.len()).enumerate() {
-            assert_eq!(token, &expected_tokens[index]);
-        }
+    macro_rules! assert_tokens {
+        ($input:expr, $expected_tokens:expr) => {
+            let tokens = tokenize($input, PathBuf::from_str("in-memory").unwrap()).unwrap();
+            // the last token by definition is end-of-file (which is not included in the explicitly expected tokens)
+            assert_eq!(tokens.len(), $expected_tokens.len() + 1);
+            assert_eq!(tokens[tokens.len() - 1].token_type, TokenType::EndOfFile);
+            for (index, token) in tokens.iter().take($expected_tokens.len()).enumerate() {
+                assert_eq!(token, &$expected_tokens[index]);
+            }
+        };
     }
 
     fn new_token(token_type: TokenType, location: Location, lexeme: String) -> Token {
@@ -383,9 +385,9 @@ mod tests {
         ];
 
         for (input, token_type) in test_data {
-            assert_tokens(
+            assert_tokens!(
                 input,
-                vec![new_token(token_type, new_loc(1, 1), input.to_string())],
+                vec![new_token(token_type, new_loc(1, 1), input.to_string())]
             );
         }
     }
@@ -394,37 +396,37 @@ mod tests {
     fn test_number_tokens() {
         let test_data = vec!["1", "23", "456", "1.2", "4.", "0.25"];
         for input in test_data {
-            assert_tokens(
+            assert_tokens!(
                 input,
                 vec![new_token(
                     TokenType::Number,
                     new_loc(1, 1),
                     input.to_string(),
-                )],
+                )]
             );
         }
     }
 
     #[test]
     fn test_numbers_with_leading_dot_as_two_tokens() {
-        assert_tokens(
+        assert_tokens!(
             ".25",
             vec![
                 new_token(TokenType::Dot, new_loc(1, 1), String::from(".")),
                 new_token(TokenType::Number, new_loc(1, 2), String::from("25")),
-            ],
+            ]
         );
     }
 
     #[test]
     fn test_string_literal() {
-        assert_tokens(
+        assert_tokens!(
             "\"literal\"",
             vec![new_token(
                 TokenType::StringLiteral,
                 new_loc(1, 1),
                 String::from("literal"),
-            )],
+            )]
         );
     }
 
@@ -436,14 +438,14 @@ mod tests {
 
     #[test]
     fn test_comment() {
-        assert_tokens(
+        assert_tokens!(
             "12 // comment",
             vec![new_token(
                 TokenType::Number,
                 new_loc(1, 1),
                 String::from("12"),
-            )],
-        )
+            )]
+        );
     }
 
     #[test]
@@ -468,9 +470,9 @@ mod tests {
         ];
 
         for (input, token_type) in testdata {
-            assert_tokens(
+            assert_tokens!(
                 input,
-                vec![new_token(token_type, new_loc(1, 1), input.to_string())],
+                vec![new_token(token_type, new_loc(1, 1), input.to_string())]
             );
         }
     }
@@ -480,13 +482,13 @@ mod tests {
         let testdata = vec!["a", "ab", "abc", "a1b", "a_1", "a_"];
 
         for input in testdata {
-            assert_tokens(
+            assert_tokens!(
                 input,
                 vec![new_token(
                     TokenType::Identifier,
                     new_loc(1, 1),
                     input.to_string(),
-                )],
+                )]
             );
         }
     }
@@ -522,6 +524,6 @@ mod tests {
             new_token(TokenType::Nil, new_loc(6, 10), String::from("nil")),
             new_token(TokenType::Semicolon, new_loc(6, 13), String::from(";")),
         ];
-        assert_tokens(input.as_str(), testdata);
+        assert_tokens!(input.as_str(), testdata);
     }
 }
