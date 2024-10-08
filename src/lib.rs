@@ -9,8 +9,8 @@
 
 use anyhow::{Context, Result};
 use ast::interpreter::{interpret, Interpreter};
-// use ast::interpreter::{eval_stmt, Evaluator};
 use ast::serializer::serialize;
+use ast::Stmt;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::{fs, io};
@@ -20,13 +20,8 @@ mod diagnostics;
 mod parser;
 mod scanner;
 
-/// Executes a Lox file.
-///
-/// The parameter `show_ast` indicates if the abstract syntax tree (AST) shall be shown.
-///
-/// The returned error is of type `anyhow::Error` and contains the details about the location
-/// in the code as well as the root cause for the error.
-pub fn execute(file_path: &Path, show_ast: bool) -> Result<()> {
+/// Creates an Abstract syntax tree from a script input.
+fn parse_into_ast(file_path: &Path) -> Result<Stmt> {
     let content = fs::read_to_string(file_path)
         .with_context(|| format!("Failed to read file {}", file_path.display()))?;
 
@@ -34,14 +29,31 @@ pub fn execute(file_path: &Path, show_ast: bool) -> Result<()> {
     let ast = parser::parse(tokens, file_path.to_path_buf())
         .with_context(|| "Failed to parse the input file")?;
 
-    if show_ast {
-        println!("Abstract Syntax Tree");
-        println!("====================");
-        println!("{}", serialize(&ast, false));
-        println!("====================");
-    }
+    Ok(ast)
+}
 
-    interpret(&ast, file_path.to_path_buf(), Some(&mut std::io::stdout()))?;
+/// Executes a Lox file.
+///
+/// The parameter `show_ast` indicates if the abstract syntax tree (AST) shall be shown.
+///
+/// The returned error is of type `anyhow::Error` and contains the details about the location
+/// in the code as well as the root cause for the error.
+pub fn execute<'a, W: Write>(file_path: &Path, output_writer: &'a mut W) -> Result<()> {
+    let ast = parse_into_ast(file_path)?;
+
+    interpret(&ast, file_path.to_path_buf(), Some(output_writer))?;
+
+    Ok(())
+}
+
+/// Prints the AST for a script to stdout.
+pub fn print_ast(file_path: &Path, show_location: bool) -> Result<()> {
+    let ast = parse_into_ast(file_path)?;
+
+    println!("Abstract Syntax Tree");
+    println!("====================");
+    println!("{}", serialize(&ast, show_location));
+    println!("====================");
 
     Ok(())
 }

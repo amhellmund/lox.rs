@@ -6,21 +6,38 @@
 use std::path::PathBuf;
 
 use anyhow::Result;
-use clap::Parser;
+use clap::{Parser, Subcommand};
 
 #[derive(Parser)]
+#[command(author, version, about, long_about = None)]
 struct Args {
-    file_path: Option<PathBuf>,
-    #[arg(long, default_value_t = false)]
-    print_ast: bool,
+    #[command(subcommand)]
+    cmd: Commands,
+}
+
+#[derive(Subcommand, Debug, Clone)]
+enum Commands {
+    PrintAst {
+        #[arg(required = true)]
+        file_path: PathBuf,
+        #[arg(long, default_value_t = false)]
+        show_location: bool,
+    },
+    Repl,
+    Run {
+        #[arg(required = true)]
+        file_path: PathBuf,
+    },
 }
 
 fn main() -> Result<()> {
     let args = Args::parse();
-    if let Some(file_path) = args.file_path {
-        println!("File argument is {}", file_path.display());
-        lox::execute(&file_path, args.print_ast)
-    } else {
-        lox::repl()
+    match args.cmd {
+        Commands::PrintAst {
+            file_path,
+            show_location,
+        } => lox::print_ast(&file_path, show_location),
+        Commands::Repl => lox::repl(),
+        Commands::Run { file_path } => lox::execute(&file_path, &mut std::io::stdout()),
     }
 }
