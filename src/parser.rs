@@ -607,9 +607,9 @@ mod tests {
                 new_print_stmt, new_string_literal_expr, new_unary_expr, new_var_decl_stmt,
                 new_variable_expr, new_while_stmt,
             },
-            BinaryOperator, ExprData, UnaryOperator,
+            BinaryOperator, ExprData, StmtData, UnaryOperator,
         },
-        diagnostics::Location,
+        diagnostics::{Location, LocationSpan},
         scanner::{Token, TokenType},
     };
     use anyhow::Result;
@@ -1017,5 +1017,75 @@ mod tests {
                 new_expr_stmt(new_assign_expr("id", new_number_literal_expr(1)))
             )
         );
+    }
+
+    fn loc_span(start: (i64, i64), end_inclusive: (i64, i64)) -> LocationSpan {
+        LocationSpan {
+            start: Location {
+                line: start.0,
+                column: start.1,
+            },
+            end_inclusive: Location {
+                line: end_inclusive.0,
+                column: end_inclusive.1,
+            },
+        }
+    }
+
+    #[test]
+    fn test_ast_with_locations() {
+        let tokens = token_seq!(
+            TokenType::If,
+            TokenType::LeftParanthesis,
+            TokenType::Identifier,
+            TokenType::RightParanthesis,
+            TokenType::LeftBrace,
+            TokenType::Identifier,
+            TokenType::Equal,
+            TokenType::Number,
+            TokenType::Semicolon,
+            TokenType::RightBrace
+        );
+        let ast = parse_decl(tokens).unwrap();
+        let expected_ast = Stmt::new(
+            StmtData::If {
+                condition: Expr::new(
+                    ExprData::Variable {
+                        name: String::from("id"),
+                    },
+                    loc_span((3, 1), (3, 2)),
+                )
+                .as_box(),
+                if_statement: Stmt::new(
+                    StmtData::Block {
+                        statements: vec![Stmt::new(
+                            StmtData::Expr {
+                                expr: Expr::new(
+                                    ExprData::Assign {
+                                        name: String::from("id"),
+                                        expr: Expr::new(
+                                            ExprData::Literal {
+                                                literal: Literal::Number(1.0),
+                                            },
+                                            loc_span((8, 1), (8, 3)),
+                                        )
+                                        .as_box(),
+                                    },
+                                    loc_span((6, 1), (8, 3)),
+                                )
+                                .as_box(),
+                            },
+                            loc_span((6, 1), (9, 1)),
+                        )],
+                    },
+                    loc_span((5, 1), (10, 1)),
+                )
+                .as_box(),
+                else_statement: None,
+            },
+            loc_span((1, 1), (10, 1)),
+        );
+
+        pretty_assertions::assert_eq!(ast, expected_ast);
     }
 }
