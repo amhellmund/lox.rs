@@ -1,3 +1,4 @@
+tests/data/scripts/block.lox
 tests/data/scripts/compute.lox
 tests/data/scripts/if.lox
 tests/data/scripts/print.lox
