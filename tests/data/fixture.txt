@@ -1,0 +1,5 @@
+tests/data/scripts/compute.lox
+tests/data/scripts/if.lox
+tests/data/scripts/print.lox
+tests/data/scripts/string.lox
+tests/data/scripts/while.lox

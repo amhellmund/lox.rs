@@ -14,12 +14,14 @@ fn get_data_dir() -> PathBuf {
 
 fn get_scripts() -> Vec<PathBuf> {
     let data_dir = get_data_dir().join("scripts");
-    data_dir
+    let mut scripts = data_dir
         .read_dir()
         .unwrap()
         .map(|path| path.unwrap().path())
         .filter(|path| path.is_file() && path.extension() == Some(OsStr::new("lox")))
-        .collect::<Vec<PathBuf>>()
+        .collect::<Vec<PathBuf>>();
+    scripts.sort();
+    scripts
 }
 
 fn extract_extracted_output(file_path: &Path) -> String {
