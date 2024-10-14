@@ -1,0 +1,17 @@
+// true
+// false
+var a = 12;
+
+if (a > 10) {
+    print true;
+}
+else {
+    print false;
+}
+
+if (a < 10) {
+    print true;
+}
+else {
+    print false;
+}

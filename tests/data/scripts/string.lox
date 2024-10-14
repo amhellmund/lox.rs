@@ -1,0 +1,10 @@
+// true
+// false
+// "abcabd"
+var s1 = "abc";
+var s2 = "abd";
+
+print (s1 < s2);
+print (s1 > s2);
+
+print s1 + s2;

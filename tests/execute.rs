@@ -1,21 +1,24 @@
+use pretty_assertions::assert_eq;
 use std::{
+    ffi::OsStr,
     io::{Read, Seek},
     path::{Path, PathBuf},
 };
 
 fn get_data_dir() -> PathBuf {
     let this_file = PathBuf::from(file!());
+    dbg!(&this_file);
     let this_dir = this_file.parent().unwrap();
     this_dir.join("data")
 }
 
 fn get_scripts() -> Vec<PathBuf> {
-    let data_dir = get_data_dir();
+    let data_dir = get_data_dir().join("scripts");
     data_dir
         .read_dir()
         .unwrap()
         .map(|path| path.unwrap().path())
-        .filter(|path| path.is_file() && path.ends_with(".lox"))
+        .filter(|path| path.is_file() && path.extension() == Some(OsStr::new("lox")))
         .collect::<Vec<PathBuf>>()
 }
 
@@ -39,6 +42,32 @@ fn execute_script(file_path: &Path) -> String {
     String::from(string_output.trim_end())
 }
 
+fn get_fixture_file() -> PathBuf {
+    get_data_dir().join("fixture.txt")
+}
+
+fn read_fixture() -> Vec<PathBuf> {
+    let content = std::fs::read_to_string(get_fixture_file()).unwrap();
+    content
+        .split('\n')
+        .map(|line| PathBuf::from(line.trim()))
+        .collect::<Vec<_>>()
+}
+
+fn write_fixture(content: &Vec<PathBuf>) {
+    let mut content = content.clone();
+    content.sort();
+    std::fs::write(
+        get_fixture_file(),
+        content
+            .iter()
+            .map(|file| String::from(file.to_str().unwrap()))
+            .collect::<Vec<String>>()
+            .join("\n"),
+    )
+    .unwrap();
+}
+
 /// Test function for Script files.
 ///
 /// Each script file contains the code to execute as well as the expected output.
@@ -52,7 +81,7 @@ fn execute_script(file_path: &Path) -> String {
 /// ```
 #[test]
 fn test_scripts() {
-    let scripts = get_scripts();
+    let scripts = &get_scripts();
 
     for file_path in scripts {
         let expected_output = extract_extracted_output(&file_path);
@@ -60,4 +89,8 @@ fn test_scripts() {
 
         assert_eq!(captured_output, expected_output);
     }
+
+    let current_fixture = read_fixture();
+    write_fixture(scripts);
+    assert_eq!(&current_fixture, scripts);
 }
