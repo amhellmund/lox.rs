@@ -245,6 +245,12 @@ impl AstTopologicalSerializer {
                 loc,
                 vec![sub_ser.serialize_name(name), sub_ser.serialize_expr(expr)],
             ),
+            ExprData::Call { callee, arguments } => {
+                let mut args = vec![sub_ser.serialize_expr(callee)];
+                args.extend(arguments.iter().map(|arg| sub_ser.serialize_expr(arg)));
+
+                self.generate_ast_serialization("call", loc, args)
+            }
             ExprData::Literal {
                 literal: Literal::Boolean(value),
             } => self.generate_ast_serialization_for_literal("bool", loc, Some(value.to_string())),

@@ -19,7 +19,7 @@ use std::path::PathBuf;
 use crate::ast::{BinaryOperator, Expr, ExprData, Literal, Stmt, StmtData, UnaryOperator};
 use crate::diagnostics::{emit_diagnostic, FileLocation, Location, LocationSpan};
 use crate::scanner::{Token, TokenType};
-use anyhow::Result;
+use anyhow::{Ok, Result};
 
 use token_sequence::TokenSequence;
 
@@ -143,6 +143,10 @@ impl Parser {
                 &self.source_file,
             ))
         }
+    }
+
+    fn current_has_token_type(&self, token_type: TokenType) -> bool {
+        return self.tokens.current_has_token_type(&vec![token_type]);
     }
 
     fn parse(mut self) -> Result<Stmt> {
@@ -482,13 +486,13 @@ impl Parser {
     /// Grammar rule:
     ///
     ///   unary: ( '!' | '-' ) unary
-    ///        | primary
+    ///        | call
     fn parse_unary(&mut self) -> Result<Expr> {
         let token_types = [TokenType::Minus, TokenType::Bang];
         if let Some(token) = self.consume_if_has_token_types(&token_types) {
             let op = get_unary_operator_from_token_type(&token.token_type);
 
-            let expr = self.parse_primary()?;
+            let expr = self.parse_unary()?;
             // The location must get preserved before the expression gets moved into the new unary expression
             let loc = LocationSpan::new(token.location, expr.get_loc().end_inclusive);
             Ok(Expr::new(
@@ -499,8 +503,51 @@ impl Parser {
                 loc,
             ))
         } else {
-            self.parse_primary()
+            self.parse_call_expression()
         }
+    }
+
+    /// Parses a call expression.
+    ///
+    /// Grammar rule:
+    ///
+    ///   call: primary ( '(' arguments? ')' )*
+    fn parse_call_expression(&mut self) -> Result<Expr> {
+        let mut lhs = self.parse_primary()?;
+
+        while let Some(_) = self.consume_if_has_token_type(TokenType::LeftParanthesis) {
+            let loc = lhs.get_loc().to_owned();
+            lhs = self.finish_call_expression(lhs, loc.start)?;
+        }
+
+        Ok(lhs)
+    }
+
+    /// Parses the arguments and the closing right parenthesis of a function call expression.
+    ///
+    /// This function assumes that the opening paranthesis has already been parsed.
+    fn finish_call_expression(&mut self, callee: Expr, start_loc: Location) -> Result<Expr> {
+        let mut arguments = Vec::<Expr>::new();
+
+        if !self.current_has_token_type(TokenType::RightParanthesis) {
+            loop {
+                arguments.push(self.parse_expression()?);
+                if !self.current_has_token_type(TokenType::Comma) {
+                    break;
+                }
+            }
+        }
+
+        let closing_token = self.consume_or_error(TokenType::RightParanthesis)?;
+
+        let loc = LocationSpan::new(start_loc, closing_token.location);
+        Ok(Expr::new(
+            ExprData::Call {
+                callee: callee.as_box(),
+                arguments,
+            },
+            loc,
+        ))
     }
 
     fn create_expr_from_literal_and_token(literal: Literal, token: &Token) -> Result<Expr> {

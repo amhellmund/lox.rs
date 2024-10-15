@@ -192,6 +192,10 @@ pub enum ExprData {
         name: String,
         expr: Box<Expr>,
     },
+    Call {
+        callee: Box<Expr>,
+        arguments: Vec<Expr>,
+    },
 }
 
 /// Test utilities when working with the Abstract Syntax Tree.

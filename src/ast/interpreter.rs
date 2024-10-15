@@ -178,6 +178,7 @@ impl<'a, W: Write> Interpreter<'a, W> {
                     ))
                 }
             }
+            ExprData::Call { .. } => todo!(),
         }
     }
 
