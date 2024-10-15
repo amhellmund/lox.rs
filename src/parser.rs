@@ -933,6 +933,24 @@ mod tests {
         );
     }
 
+    #[test]
+    fn test_function_call_expr_with_nested_call_expr() {
+        parse_expr_and_check!(
+            token_seq!(
+                TokenType::Identifier,
+                TokenType::LeftParanthesis,
+                TokenType::Identifier,
+                TokenType::LeftParanthesis,
+                TokenType::RightParanthesis,
+                TokenType::RightParanthesis,
+            ),
+            new_function_call_expr(
+                new_variable_expr("id"),
+                vec![new_function_call_expr(new_variable_expr("id"), vec![])]
+            )
+        );
+    }
+
     ///////////////////////////////////////
     /// Structural Tests for Statements ///
     ///////////////////////////////////////
