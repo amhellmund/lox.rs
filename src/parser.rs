@@ -535,6 +535,7 @@ impl Parser {
                 if !self.current_has_token_type(TokenType::Comma) {
                     break;
                 }
+                self.consume_or_error(TokenType::Comma)?;
             }
         }
 
@@ -649,10 +650,10 @@ mod tests {
         ast::{
             serializer::tests::{serialize_expr, serialize_stmt},
             tests::{
-                new_assign_expr, new_binary_expr, new_block_stmt, new_expr_stmt, new_grouping_expr,
-                new_if_else_stmt, new_if_stmt, new_literal_expr, new_number_literal_expr,
-                new_print_stmt, new_string_literal_expr, new_unary_expr, new_var_decl_stmt,
-                new_variable_expr, new_while_stmt,
+                new_assign_expr, new_binary_expr, new_block_stmt, new_expr_stmt,
+                new_function_call_expr, new_grouping_expr, new_if_else_stmt, new_if_stmt,
+                new_literal_expr, new_number_literal_expr, new_print_stmt, new_string_literal_expr,
+                new_unary_expr, new_var_decl_stmt, new_variable_expr, new_while_stmt,
             },
             BinaryOperator, ExprData, StmtData, UnaryOperator,
         },
@@ -681,14 +682,14 @@ mod tests {
     }
 
     macro_rules! token_seq {
-        ($($token:expr),*) => {
+        ($($token:expr),* $(,)?) => {
             build_token_sequence(vec![$($token),*])
         }
     }
 
     #[test]
     fn test_build_token_sequence() {
-        let tokens = token_seq![TokenType::And, TokenType::Identifier];
+        let tokens = token_seq![TokenType::And, TokenType::Identifier,];
         assert_eq!(tokens.len(), 3);
         assert_eq!(
             tokens[0],
@@ -818,7 +819,7 @@ mod tests {
             token_seq!(
                 TokenType::LeftParanthesis,
                 TokenType::Number,
-                TokenType::RightParanthesis
+                TokenType::RightParanthesis,
             ),
             new_grouping_expr(new_number_literal_expr(1))
         );
@@ -878,7 +879,7 @@ mod tests {
             token_seq!(
                 TokenType::Identifier,
                 TokenType::Equal,
-                TokenType::StringLiteral
+                TokenType::StringLiteral,
             ),
             new_assign_expr("id", new_string_literal_expr("value"))
         );
@@ -891,14 +892,50 @@ mod tests {
             TokenType::Plus,
             TokenType::Number,
             TokenType::Equal,
-            TokenType::StringLiteral
+            TokenType::StringLiteral,
         );
         assert!(parse_expr(tokens).is_err());
     }
 
-    ////////////////////////////////////////
-    /// Structural Tests for Expressions ///
-    ////////////////////////////////////////
+    #[test]
+    fn test_function_call_expr_no_arguments() {
+        parse_expr_and_check!(
+            token_seq!(
+                TokenType::Identifier,
+                TokenType::LeftParanthesis,
+                TokenType::RightParanthesis,
+            ),
+            new_function_call_expr(new_variable_expr("id"), vec![])
+        );
+    }
+
+    #[test]
+    fn test_function_call_expr_with_arguments() {
+        parse_expr_and_check!(
+            token_seq!(
+                TokenType::Identifier,
+                TokenType::LeftParanthesis,
+                TokenType::Number,
+                TokenType::Comma,
+                TokenType::StringLiteral,
+                TokenType::Comma,
+                TokenType::Nil,
+                TokenType::RightParanthesis,
+            ),
+            new_function_call_expr(
+                new_variable_expr("id"),
+                vec![
+                    new_number_literal_expr(1.0),
+                    new_string_literal_expr("value"),
+                    new_literal_expr(Literal::Nil),
+                ]
+            )
+        );
+    }
+
+    ///////////////////////////////////////
+    /// Structural Tests for Statements ///
+    ///////////////////////////////////////
     ///
     /// Note: the tests here are white-box tests that directly test the parsing on the grammar-level of
     /// declarations instead of the whole program. The reason is that using the `parse` or `parse_program`
@@ -921,7 +958,7 @@ mod tests {
                 TokenType::Identifier,
                 TokenType::Equal,
                 TokenType::Number,
-                TokenType::Semicolon
+                TokenType::Semicolon,
             ),
             new_var_decl_stmt("id", new_number_literal_expr(1))
         );
@@ -935,7 +972,7 @@ mod tests {
                 TokenType::Var,
                 TokenType::Identifier,
                 TokenType::Equal,
-                TokenType::Semicolon
+                TokenType::Semicolon,
             ),
         ];
         for tokens in test_data {
@@ -978,7 +1015,7 @@ mod tests {
                 TokenType::Print,
                 TokenType::Number,
                 TokenType::Semicolon,
-                TokenType::RightBrace
+                TokenType::RightBrace,
             ),
             new_block_stmt(vec![new_print_stmt(new_number_literal_expr(1))])
         );
@@ -994,7 +1031,7 @@ mod tests {
                 TokenType::Equal,
                 TokenType::Number,
                 TokenType::Semicolon,
-                TokenType::RightBrace
+                TokenType::RightBrace,
             ),
             new_block_stmt(vec![new_var_decl_stmt("id", new_number_literal_expr(1))])
         );
@@ -1011,7 +1048,7 @@ mod tests {
                 TokenType::Identifier,
                 TokenType::Equal,
                 TokenType::Number,
-                TokenType::Semicolon
+                TokenType::Semicolon,
             ),
             new_if_stmt(
                 new_number_literal_expr(1),
@@ -1036,7 +1073,7 @@ mod tests {
                 TokenType::Identifier,
                 TokenType::Equal,
                 TokenType::Nil,
-                TokenType::Semicolon
+                TokenType::Semicolon,
             ),
             new_if_else_stmt(
                 new_number_literal_expr(1),
@@ -1057,7 +1094,7 @@ mod tests {
                 TokenType::Identifier,
                 TokenType::Equal,
                 TokenType::Number,
-                TokenType::Semicolon
+                TokenType::Semicolon,
             ),
             new_while_stmt(
                 new_number_literal_expr(1),
@@ -1091,7 +1128,7 @@ mod tests {
             TokenType::Equal,
             TokenType::Number,
             TokenType::Semicolon,
-            TokenType::RightBrace
+            TokenType::RightBrace,
         );
         let ast = parse_decl(tokens).unwrap();
         let expected_ast = Stmt::new(

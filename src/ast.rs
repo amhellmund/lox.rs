@@ -345,4 +345,12 @@ pub mod tests {
     pub fn new_variable_expr(name: &str) -> Expr {
         new_expr(ExprData::Variable { name: name.into() })
     }
+
+    /// Creates a new function call expression.
+    pub fn new_function_call_expr(callee: Expr, arguments: Vec<Expr>) -> Expr {
+        new_expr(ExprData::Call {
+            callee: callee.as_box(),
+            arguments,
+        })
+    }
 }

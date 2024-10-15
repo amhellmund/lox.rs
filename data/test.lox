@@ -10,3 +10,5 @@ while (a < 10000) {
   a = b;
   b = temp + b;
 }
+
+var b = a()("abc")(12,11);
