@@ -10,7 +10,11 @@
 //!   o Variables
 //!   o Scopes
 
-use std::collections::HashMap;
+use std::{
+    cell::{Ref, RefCell},
+    collections::HashMap,
+    rc::Rc,
+};
 
 use super::ExprValue;
 
@@ -23,13 +27,21 @@ use super::ExprValue;
 ///   o Variables defined in an outer scope are still visible in an inner scope.
 struct Scope {
     variables: HashMap<String, ExprValue>,
+    parent: Option<McScopeRef>,
 }
 
+type McScopeRef = Rc<RefCell<Scope>>;
+
 impl Scope {
-    fn new() -> Self {
+    fn new(parent: Option<McScopeRef>) -> Self {
         Self {
             variables: HashMap::new(),
+            parent,
         }
+    }
+
+    pub fn as_rc_ref_cell(self) -> McScopeRef {
+        Rc::new(RefCell::new(self))
     }
 
     pub fn define_variable(&mut self, name: &str, value: ExprValue) {
@@ -53,43 +65,46 @@ impl Scope {
 ///   o defines variables in the current inner-most scope.
 ///   o gets variables' values from one of the defined scopes.
 pub struct ExecutionEnvironment {
-    scopes: Vec<Scope>,
+    global_scope: McScopeRef,
+    current_scope: McScopeRef,
 }
 
 impl ExecutionEnvironment {
     pub fn new() -> Self {
+        let global_scope = Scope::new(None).as_rc_ref_cell();
         ExecutionEnvironment {
-            scopes: vec![Scope::new()],
+            global_scope: Rc::clone(&global_scope),
+            current_scope: Rc::clone(&global_scope),
         }
+    }
+
+    fn new_scope_with_parent(&self) -> McScopeRef {
+        Scope::new(Some(Rc::clone(&self.current_scope))).as_rc_ref_cell()
     }
 
     /// Creates a new inner-most scope.
     ///
     /// Creating a new scope always succeeds (unless OS limits are hit).
     pub fn create_scope(&mut self) {
-        self.scopes.push(Scope::new());
+        self.current_scope = self.new_scope_with_parent();
     }
 
     /// Drops the inner-most scope.
     ///
-    /// Deleting an inner-most scope is not possible if only one scope
-    /// (the global scope) is available.
-    ///
-    /// Post-Condition: at least one scope exists.
-    pub fn drop_innermost_scope(&mut self) -> bool {
-        if self.scopes.len() > 1 {
-            self.scopes.pop();
-            assert!(self.scopes.len() >= 1);
-            true
-        } else {
-            false
-        }
+    /// In case the last inner scope is reached, the `current_scope` becomes the `global_scope` again.
+    pub fn drop_innermost_scope(&mut self) {
+        let parent_scope = match self.current_scope.borrow().parent.as_ref() {
+            Some(parent) => Rc::clone(parent),
+            None => Rc::clone(&self.global_scope),
+        };
+        self.current_scope = parent_scope;
     }
 
     /// Defines a new variable within the inner-most scope.
     pub fn define_variable(&mut self, name: &str, value: ExprValue) {
-        let scope = self.scopes.last_mut().unwrap();
-        scope.define_variable(name.into(), value);
+        self.current_scope
+            .borrow_mut()
+            .define_variable(name.into(), value);
     }
 
     /// Assigns a value to an existing variable.
@@ -97,13 +112,19 @@ impl ExecutionEnvironment {
     /// Returns true if the value could get assigned, or false if the variable does
     /// not exist in any scope.
     pub fn assign_variable(&mut self, name: &str, value: ExprValue) -> bool {
-        for i in (0..self.scopes.len()).rev() {
-            if self.scopes[i].has_variable(name) {
-                self.scopes[i].define_variable(name, value);
+        let mut cur_scope = self.current_scope.borrow_mut();
+        loop {
+            if cur_scope.has_variable(name) {
+                cur_scope.define_variable(name, value);
                 return true;
+            } else {
+                let parent_scope = match cur_scope.parent.as_ref() {
+                    Some(parent) => Rc::clone(parent),
+                    None => return false,
+                };
+                cur_scope = Rc::clone(parent_scope.borrow_mut());
             }
         }
-        false
     }
 
     /// Returns the variable value from any scope along the lexical scope chain.
