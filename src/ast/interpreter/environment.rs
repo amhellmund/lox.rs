@@ -78,17 +78,28 @@ impl ExecutionEnvironment {
         Scope::new(Some(Rc::clone(&self.current_scope))).as_rc_ref_cell()
     }
 
+    /// Clones the current environment while keeping the references active.
+    ///
+    /// This function is used for functions that share parent scopes.
+    /// It basically branches off from the current chain.
+    pub fn clone_with_keeping_scopes(&self) -> Self {
+        ExecutionEnvironment {
+            global_scope: Rc::clone(&self.global_scope),
+            current_scope: Rc::clone(&self.current_scope),
+        }
+    }
+
     /// Creates a new inner-most scope.
     ///
     /// Creating a new scope always succeeds (unless OS limits are hit).
-    pub fn create_scope(&mut self) {
+    pub fn create_lexical_scope(&mut self) {
         self.current_scope = self.new_scope_with_parent();
     }
 
     /// Drops the inner-most scope.
     ///
     /// In case the last inner scope is reached, the `current_scope` becomes the `global_scope` again.
-    pub fn drop_innermost_scope(&mut self) {
+    pub fn drop_innermost_lexical_scope(&mut self) {
         let parent_scope = match self.current_scope.borrow().parent.as_ref() {
             Some(parent) => Rc::clone(parent),
             None => Rc::clone(&self.global_scope),
@@ -168,11 +179,11 @@ mod tests {
     fn test_assign_variable() {
         let mut env = ExecutionEnvironment::new();
         env.define_variable("name", ExprValue::Number(1.0));
-        let _1 = env.create_scope();
-        let _2 = env.create_scope();
+        let _1 = env.create_lexical_scope();
+        let _2 = env.create_lexical_scope();
         env.assign_variable("name", ExprValue::Number(2.0));
-        env.drop_innermost_scope();
-        env.drop_innermost_scope();
+        env.drop_innermost_lexical_scope();
+        env.drop_innermost_lexical_scope();
 
         assert_eq!(env.get_variable("name").unwrap(), ExprValue::Number(2.0));
     }
@@ -183,14 +194,42 @@ mod tests {
         env.define_variable("name", ExprValue::Number(1.0));
 
         {
-            env.create_scope();
+            env.create_lexical_scope();
             env.define_variable("name", ExprValue::String("string".into()));
             let inner_value = env.get_variable("name").unwrap();
             assert_eq!(inner_value, ExprValue::String(String::from("string")));
-            env.drop_innermost_scope();
+            env.drop_innermost_lexical_scope();
         }
 
         let outer_value = env.get_variable("name").unwrap();
         assert_eq!(outer_value, ExprValue::Number(1.0));
+    }
+
+    #[test]
+    fn test_clone_with_keeping_scopes() {
+        let mut env_first = ExecutionEnvironment::new();
+        env_first.define_variable("name", ExprValue::Number(1.0));
+
+        env_first.create_lexical_scope();
+        env_first.define_variable("name1", ExprValue::String("string".into()));
+
+        let mut env_second = env_first.clone_with_keeping_scopes();
+        env_second.create_lexical_scope();
+        env_second.define_variable("name1", ExprValue::Boolean(true));
+
+        env_second.assign_variable("name", ExprValue::Nil);
+
+        assert_eq!(
+            env_first.get_variable("name1"),
+            Some(ExprValue::String("string".into()))
+        );
+
+        assert_eq!(
+            env_second.get_variable("name1"),
+            Some(ExprValue::Boolean(true))
+        );
+
+        assert_eq!(env_first.get_variable("name"), Some(ExprValue::Nil));
+        assert_eq!(env_second.get_variable("name"), Some(ExprValue::Nil));
     }
 }

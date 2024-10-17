@@ -95,9 +95,9 @@ impl<'a, W: Write> Interpreter<'a, W> {
             StmtData::Block { statements, .. } => {
                 // Errors when executing statements shall not be propagated as is, because
                 // the scope must get cleaned up properly at the end of the block.
-                self.env.create_scope();
+                self.env.create_lexical_scope();
                 let result = self.interpret_stmts(statements);
-                self.env.drop_innermost_scope();
+                self.env.drop_innermost_lexical_scope();
                 return result;
             }
             StmtData::VarDecl {
@@ -691,9 +691,9 @@ mod tests {
         let ast = new_assign_expr("id", new_number_literal_expr(10));
         let mut interpreter =
             new_test_interpreter_with_variables(vec![("id", ExprValue::Number(1.0))]);
-        interpreter.env.create_scope();
+        interpreter.env.create_lexical_scope();
         let value = interpreter.interpret_expr(&ast).unwrap();
-        interpreter.env.drop_innermost_scope();
+        interpreter.env.drop_innermost_lexical_scope();
         assert_eq!(value, ExprValue::Number(10.0));
     }
 
