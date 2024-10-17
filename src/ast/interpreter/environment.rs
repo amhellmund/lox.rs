@@ -10,11 +10,7 @@
 //!   o Variables
 //!   o Scopes
 
-use std::{
-    cell::{Ref, RefCell},
-    collections::HashMap,
-    rc::Rc,
-};
+use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use super::ExprValue;
 
@@ -112,17 +108,17 @@ impl ExecutionEnvironment {
     /// Returns true if the value could get assigned, or false if the variable does
     /// not exist in any scope.
     pub fn assign_variable(&mut self, name: &str, value: ExprValue) -> bool {
-        let mut cur_scope = self.current_scope.borrow_mut();
+        let mut cur_scope = Rc::clone(&self.current_scope);
         loop {
-            if cur_scope.has_variable(name) {
-                cur_scope.define_variable(name, value);
+            if cur_scope.borrow().has_variable(name) {
+                cur_scope.borrow_mut().define_variable(name, value);
                 return true;
             } else {
-                let parent_scope = match cur_scope.parent.as_ref() {
+                let parent_scope = match cur_scope.borrow().parent.as_ref() {
                     Some(parent) => Rc::clone(parent),
                     None => return false,
                 };
-                cur_scope = Rc::clone(parent_scope.borrow_mut());
+                cur_scope = Rc::clone(&parent_scope);
             }
         }
     }
@@ -131,13 +127,19 @@ impl ExecutionEnvironment {
     ///
     /// Returns None if the variable cannot be found in any scope.
     pub fn get_variable(&self, name: &str) -> Option<ExprValue> {
-        for i in (0..self.scopes.len()).rev() {
-            let scope_variable = self.scopes[i].get_variable(name);
-            if scope_variable.is_some() {
-                return scope_variable;
+        let mut cur_scope = Rc::clone(&self.current_scope);
+        loop {
+            let var = cur_scope.borrow().get_variable(name);
+            if var.is_some() {
+                return var;
+            } else {
+                let parent_scope = match cur_scope.borrow().parent.as_ref() {
+                    Some(parent) => Rc::clone(parent),
+                    None => return None,
+                };
+                cur_scope = Rc::clone(&parent_scope);
             }
         }
-        None
     }
 }
 
