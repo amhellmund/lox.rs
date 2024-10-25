@@ -11,4 +11,6 @@ while (a < 10000) {
   b = temp + b;
 }
 
-var b = a()("abc")(12,11);
+var start = std_clock();
+var end = std_clock();
+print end - start;

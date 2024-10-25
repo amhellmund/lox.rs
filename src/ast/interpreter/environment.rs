@@ -12,7 +12,7 @@
 
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
-use super::ExprValue;
+use super::{function::NativeFunction, ExprValue};
 
 /// Scope.
 ///
@@ -21,6 +21,7 @@ use super::ExprValue;
 ///   o Variables defined in an inner scope are only 'seen' within this scope.
 ///   o Variables redefind in an inner scope shadow variables defined in an outer scope.
 ///   o Variables defined in an outer scope are still visible in an inner scope.
+#[derive(PartialEq, Debug)]
 struct Scope {
     variables: HashMap<String, ExprValue>,
     parent: Option<McScopeRef>,
@@ -60,14 +61,24 @@ impl Scope {
 ///   o handles the entrance and exit of scopes.
 ///   o defines variables in the current inner-most scope.
 ///   o gets variables' values from one of the defined scopes.
+#[derive(PartialEq, Debug, Clone)]
 pub struct ExecutionEnvironment {
     global_scope: McScopeRef,
     current_scope: McScopeRef,
 }
 
 impl ExecutionEnvironment {
+    fn setup_ffi(global_scope: &mut Scope) {
+        global_scope.define_variable(
+            "std_clock",
+            ExprValue::NativeFunction(NativeFunction::Clock),
+        );
+    }
+
     pub fn new() -> Self {
-        let global_scope = Scope::new(None).as_rc_ref_cell();
+        let mut global_scope = Scope::new(None);
+        Self::setup_ffi(&mut global_scope);
+        let global_scope = global_scope.as_rc_ref_cell();
         ExecutionEnvironment {
             global_scope: Rc::clone(&global_scope),
             current_scope: Rc::clone(&global_scope),

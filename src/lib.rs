@@ -11,8 +11,10 @@ use anyhow::{Context, Result};
 use ast::interpreter::{interpret, Interpreter};
 use ast::serializer::serialize;
 use ast::Stmt;
+use std::cell::RefCell;
 use std::io::Write;
 use std::path::{Path, PathBuf};
+use std::rc::Rc;
 use std::{fs, io};
 
 mod ast;
@@ -41,7 +43,11 @@ fn parse_into_ast(file_path: &Path) -> Result<Stmt> {
 pub fn execute<'a, W: Write>(file_path: &Path, output_writer: &'a mut W) -> Result<()> {
     let ast = parse_into_ast(file_path)?;
 
-    interpret(&ast, file_path.to_path_buf(), Some(output_writer))?;
+    interpret(
+        &ast,
+        file_path.to_path_buf(),
+        Some(Rc::new(RefCell::new(output_writer))),
+    )?;
 
     Ok(())
 }
@@ -61,7 +67,10 @@ pub fn print_ast(file_path: &Path, show_location: bool) -> Result<()> {
 /// Starts a Lox REPL shell to interactively run statements and expressions.
 pub fn repl() -> Result<()> {
     let mut output_writer = std::io::stdout();
-    let mut interpreter = Interpreter::new("repl".into(), Some(&mut output_writer));
+    let mut interpreter = Interpreter::new(
+        "repl".into(),
+        Some(Rc::new(RefCell::new(&mut output_writer))),
+    );
 
     print_repl_info();
     loop {

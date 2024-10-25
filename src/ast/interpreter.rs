@@ -9,11 +9,13 @@
 //! of the AST.
 
 mod environment;
+mod function;
 
-use std::{io::Write, path::PathBuf};
+use std::{cell::RefCell, io::Write, path::PathBuf, rc::Rc};
 
 use anyhow::Result;
 use environment::ExecutionEnvironment;
+use function::{Callable, Function, NativeFunction};
 
 use crate::{
     ast::{Expr, Literal},
@@ -29,6 +31,8 @@ pub enum ExprValue {
     String(String),
     Boolean(bool),
     Nil,
+    NativeFunction(NativeFunction),
+    Function(Function),
 }
 
 impl ExprValue {
@@ -38,6 +42,8 @@ impl ExprValue {
             ExprValue::Nil => String::from("nil"),
             ExprValue::Number(_) => String::from("number"),
             ExprValue::String(_) => String::from("string"),
+            ExprValue::NativeFunction(_) => String::from("native-function"),
+            ExprValue::Function(_) => String::from("function"),
         }
     }
 }
@@ -49,6 +55,10 @@ impl ToString for ExprValue {
             ExprValue::Nil => String::from("nil"),
             ExprValue::Number(value) => value.to_string(),
             ExprValue::String(value) => format!("\"{}\"", value.to_string()),
+            ExprValue::Function(function) => format!("function<{}>", function.get_name()),
+            ExprValue::NativeFunction(native_function) => {
+                format!("ffi<{}>", native_function.get_name())
+            }
         }
     }
 }
@@ -59,7 +69,7 @@ impl ToString for ExprValue {
 pub fn interpret<'a, W: Write>(
     stmt: &Stmt,
     source_file: PathBuf,
-    output_writer: Option<&'a mut W>,
+    output_writer: Option<Rc<RefCell<&'a mut W>>>,
 ) -> Result<()> {
     let mut interpreter = Interpreter::new(source_file, output_writer);
     interpreter.interpret(stmt)
@@ -69,15 +79,23 @@ pub fn interpret<'a, W: Write>(
 pub struct Interpreter<'a, W: Write> {
     source_file: PathBuf,
     env: ExecutionEnvironment,
-    output_writer: Option<&'a mut W>,
+    output_writer: Option<Rc<RefCell<&'a mut W>>>,
 }
 
 impl<'a, W: Write> Interpreter<'a, W> {
-    pub fn new(source_file: PathBuf, output_writer: Option<&'a mut W>) -> Self {
+    pub fn new(source_file: PathBuf, output_writer: Option<Rc<RefCell<&'a mut W>>>) -> Self {
         Self {
             source_file,
             env: ExecutionEnvironment::new(),
             output_writer,
+        }
+    }
+
+    fn with_new_env(&self, env: ExecutionEnvironment) -> Self {
+        Self {
+            source_file: self.source_file.clone(),
+            env,
+            output_writer: self.output_writer.clone(),
         }
     }
 
@@ -113,8 +131,10 @@ impl<'a, W: Write> Interpreter<'a, W> {
             }
             StmtData::Print { expr, .. } => {
                 let expr_value = self.interpret_expr(expr)?;
-                if let Some(writer) = &mut self.output_writer {
-                    writer.write_fmt(format_args!("{}\n", expr_value.to_string()))?;
+                if let Some(writer) = self.output_writer.clone() {
+                    writer
+                        .borrow_mut()
+                        .write_fmt(format_args!("{}\n", expr_value.to_string()))?;
                 }
             }
             StmtData::If {
@@ -178,7 +198,53 @@ impl<'a, W: Write> Interpreter<'a, W> {
                     ))
                 }
             }
-            ExprData::Call { .. } => todo!(),
+            ExprData::Call { callee, arguments } => {
+                let callee_value = self.interpret_expr(callee)?;
+                match callee_value {
+                    ExprValue::Function(function) => {
+                        let name = function.get_name();
+                        self.interpret_function_call(&function, name, arguments, loc)
+                    }
+                    ExprValue::NativeFunction(native_function) => {
+                        let name = native_function.get_name();
+                        self.interpret_function_call(&native_function, name, arguments, loc)
+                    }
+                    _ => Err(emit_diagnostic(
+                        format!(
+                            "Expression other than functions or native functions cannot be called"
+                        ),
+                        FileLocation::Span(*loc),
+                        &self.source_file,
+                    )),
+                }
+            }
+        }
+    }
+
+    fn interpret_function_call<T: Callable<'a, W>>(
+        &mut self,
+        callable: &T,
+        name: String,
+        arguments: &Vec<Expr>,
+        loc: &LocationSpan,
+    ) -> Result<ExprValue> {
+        if callable.get_function_arity() != arguments.len() as i64 {
+            Err(emit_diagnostic(
+                format!(
+                    "Function arguments mistmatch for '{}': expected {}, got {}",
+                    name,
+                    callable.get_function_arity(),
+                    arguments.len()
+                ),
+                FileLocation::Span(*loc),
+                &self.source_file,
+            ))
+        } else {
+            let mut argument_values = Vec::<ExprValue>::new();
+            for arg in arguments {
+                argument_values.push(self.interpret_expr(arg)?);
+            }
+            callable.call(argument_values, self)
         }
     }
 
@@ -253,6 +319,14 @@ impl<'a, W: Write> Interpreter<'a, W> {
             )),
             ExprValue::Boolean(_) => Err(self.emit_eval_error(
                 format!("Expression of type 'bool' is not supported for binary operators"),
+                loc,
+            )),
+            ExprValue::NativeFunction(_) => Err(self.emit_eval_error(
+                format!("Expression of type 'ffi' is not supported for binary operators"),
+                loc,
+            )),
+            ExprValue::Function(_) => Err(self.emit_eval_error(
+                format!("Expression of type 'function' is not supported for binary operators"),
                 loc,
             )),
         }
@@ -376,8 +450,10 @@ impl<'a, W: Write> Interpreter<'a, W> {
 
 #[cfg(test)]
 mod tests {
+    use std::cell::RefCell;
     use std::io::{Read, Seek, Write};
     use std::path::PathBuf;
+    use std::rc::Rc;
 
     use super::ExprValue;
     use crate::ast::interpreter::{interpret, Interpreter};
@@ -716,7 +792,12 @@ mod tests {
             new_number_literal_expr(2),
         ));
         let mut output_writer = std::io::Cursor::new(Vec::<u8>::new());
-        interpret(&ast, PathBuf::from("in-memory"), Some(&mut output_writer)).unwrap();
+        interpret(
+            &ast,
+            PathBuf::from("in-memory"),
+            Some(Rc::new(RefCell::new(&mut output_writer))),
+        )
+        .unwrap();
 
         // read the content from the output writer and trim the ending whitespaces
         output_writer.seek(std::io::SeekFrom::Start(0)).unwrap();

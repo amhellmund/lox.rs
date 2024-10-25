@@ -28,7 +28,7 @@ use crate::diagnostics::LocationSpan;
 use strum_macros::EnumIter;
 
 /// Statements.
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Debug, Clone)]
 pub struct Stmt {
     data: StmtData,
     loc: LocationSpan,
@@ -52,7 +52,7 @@ impl Stmt {
     }
 }
 
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Debug, Clone)]
 pub enum StmtData {
     Block {
         statements: Vec<Stmt>,
@@ -128,7 +128,7 @@ impl ToString for BinaryOperator {
 }
 
 /// Expression Literal.
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Debug, Clone)]
 pub enum Literal {
     Number(f64),
     String(String),
@@ -137,7 +137,7 @@ pub enum Literal {
 }
 
 /// Expression.
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Debug, Clone)]
 pub struct Expr {
     data: ExprData,
     loc: LocationSpan,
@@ -168,7 +168,7 @@ impl Expr {
     }
 }
 
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Debug, Clone)]
 pub enum ExprData {
     Binary {
         lhs: Box<Expr>,
