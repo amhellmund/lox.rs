@@ -14,3 +14,6 @@ while (a < 10000) {
 var start = std_clock();
 var end = std_clock();
 print end - start;
+
+var in = std_read_stdin();
+print in;

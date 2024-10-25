@@ -73,6 +73,10 @@ impl ExecutionEnvironment {
             "std_clock",
             ExprValue::NativeFunction(NativeFunction::Clock),
         );
+        global_scope.define_variable(
+            "std_read_stdin",
+            ExprValue::NativeFunction(NativeFunction::ReadStdIn),
+        );
     }
 
     pub fn new() -> Self {

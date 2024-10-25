@@ -37,6 +37,8 @@ pub trait Callable {
 pub enum NativeFunction {
     /// Provides the elapsed time in s since some arbitary point in time.
     Clock,
+    /// Reads from stdin
+    ReadStdIn,
 }
 
 fn ffi_clock(_: Vec<ExprValue>) -> Result<ExprValue> {
@@ -47,23 +49,29 @@ fn ffi_clock(_: Vec<ExprValue>) -> Result<ExprValue> {
     return Ok(ExprValue::Number(elasped_seconds));
 }
 
+fn ffi_read_std_in(_: Vec<ExprValue>) -> Result<ExprValue> {
+    let mut buffer = String::new();
+    std::io::stdin().read_line(&mut buffer)?;
+    Ok(ExprValue::String(String::from(buffer.trim_end())))
+}
+
 impl NativeFunction {
-    fn get_execution_info(&self) -> (i64, fn(Vec<ExprValue>) -> Result<ExprValue>) {
+    fn get_execution_info(&self) -> (i64, String, fn(Vec<ExprValue>) -> Result<ExprValue>) {
         match self {
-            NativeFunction::Clock => (0, ffi_clock),
+            NativeFunction::Clock => (0, String::from("clock"), ffi_clock),
+            NativeFunction::ReadStdIn => (0, String::from("read_stdin"), ffi_read_std_in),
         }
     }
 }
 
 impl Callable for NativeFunction {
     fn get_name(&self) -> String {
-        match self {
-            NativeFunction::Clock => String::from("clock"),
-        }
+        let (_, name, _) = self.get_execution_info();
+        return name;
     }
 
     fn get_function_arity(&self) -> i64 {
-        let (arity, _) = self.get_execution_info();
+        let (arity, _, _) = self.get_execution_info();
         arity
     }
 
@@ -72,7 +80,7 @@ impl Callable for NativeFunction {
         arguments: Vec<ExprValue>,
         _: &mut Interpreter<'a, W>,
     ) -> Result<ExprValue> {
-        let (_, callback) = self.get_execution_info();
+        let (_, _, callback) = self.get_execution_info();
         callback(arguments)
     }
 }
