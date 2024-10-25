@@ -17,9 +17,10 @@ use super::{environment::ExecutionEnvironment, ExprValue, Interpreter};
 use std::{io::Write, time::SystemTime};
 
 /// Callable interface for all function types in Lox.
-pub trait Callable<'a, W: Write> {
+pub trait Callable {
+    fn get_name(&self) -> String;
     fn get_function_arity(&self) -> i64;
-    fn call(
+    fn call<'a, W: Write>(
         &self,
         arguments: Vec<ExprValue>,
         interpreter: &mut Interpreter<'a, W>,
@@ -47,12 +48,6 @@ fn ffi_clock(_: Vec<ExprValue>) -> Result<ExprValue> {
 }
 
 impl NativeFunction {
-    pub fn get_name(&self) -> String {
-        match self {
-            NativeFunction::Clock => String::from("clock"),
-        }
-    }
-
     fn get_execution_info(&self) -> (i64, fn(Vec<ExprValue>) -> Result<ExprValue>) {
         match self {
             NativeFunction::Clock => (0, ffi_clock),
@@ -60,13 +55,23 @@ impl NativeFunction {
     }
 }
 
-impl<'a, W: Write> Callable<'a, W> for NativeFunction {
+impl Callable for NativeFunction {
+    fn get_name(&self) -> String {
+        match self {
+            NativeFunction::Clock => String::from("clock"),
+        }
+    }
+
     fn get_function_arity(&self) -> i64 {
         let (arity, _) = self.get_execution_info();
         arity
     }
 
-    fn call(&self, arguments: Vec<ExprValue>, _: &mut Interpreter<'a, W>) -> Result<ExprValue> {
+    fn call<'a, W: Write>(
+        &self,
+        arguments: Vec<ExprValue>,
+        _: &mut Interpreter<'a, W>,
+    ) -> Result<ExprValue> {
         let (_, callback) = self.get_execution_info();
         callback(arguments)
     }
@@ -80,20 +85,22 @@ pub struct Function {
     environment: ExecutionEnvironment,
 }
 
-impl Function {
-    pub fn get_name(&self) -> String {
+impl Callable for Function {
+    fn get_name(&self) -> String {
         self.name.clone()
     }
-}
 
-impl<'a, W: Write> Callable<'a, W> for Function {
     fn get_function_arity(&self) -> i64 {
         self.arity
     }
 
-    fn call(&self, _: Vec<ExprValue>, interpreter: &mut Interpreter<'a, W>) -> Result<ExprValue> {
+    fn call<'a, W: Write>(
+        &self,
+        _: Vec<ExprValue>,
+        interpreter: &mut Interpreter<'a, W>,
+    ) -> Result<ExprValue> {
         let mut new_interpreter = interpreter.with_new_env(self.environment.clone());
-        new_interpreter.interpret(&self.block);
+        new_interpreter.interpret(&self.block)?;
         Ok(ExprValue::Nil)
     }
 }

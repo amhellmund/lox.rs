@@ -55,7 +55,9 @@ impl ToString for ExprValue {
             ExprValue::Nil => String::from("nil"),
             ExprValue::Number(value) => value.to_string(),
             ExprValue::String(value) => format!("\"{}\"", value.to_string()),
-            ExprValue::Function(function) => format!("function<{}>", function.get_name()),
+            ExprValue::Function(function) => {
+                format!("function<{}>", function.get_name())
+            }
             ExprValue::NativeFunction(native_function) => {
                 format!("ffi<{}>", native_function.get_name())
             }
@@ -221,7 +223,7 @@ impl<'a, W: Write> Interpreter<'a, W> {
         }
     }
 
-    fn interpret_function_call<T: Callable<'a, W>>(
+    fn interpret_function_call<T: Callable>(
         &mut self,
         callable: &T,
         name: String,
