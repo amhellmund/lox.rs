@@ -308,8 +308,8 @@ pub mod tests {
             new_assign_expr, new_binary_expr, new_block_stmt, new_boolean_literal_expr,
             new_expr_stmt, new_function_decl_stmt, new_grouping_expr, new_if_else_stmt,
             new_if_stmt, new_literal_expr, new_number_literal_expr, new_print_stmt,
-            new_string_literal_expr, new_unary_expr, new_var_decl_stmt, new_variable_expr,
-            new_while_stmt,
+            new_return_stmt, new_string_literal_expr, new_unary_expr, new_var_decl_stmt,
+            new_variable_expr, new_while_stmt,
         },
         BinaryOperator, Expr, Literal, Stmt, UnaryOperator,
     };
@@ -498,6 +498,20 @@ pub mod tests {
                       )
                     )
                   )
+                )
+                "#,
+            )
+        );
+    }
+
+    #[test]
+    fn test_stmt_return() {
+        assert_serialized!(
+            new_return_stmt(new_number_literal_expr(1)),
+            dedent(
+                r#"
+                (return
+                  (number 1)
                 )
                 "#,
             )

@@ -294,6 +294,13 @@ pub mod tests {
         })
     }
 
+    /// Creates a new return statement.
+    pub fn new_return_stmt(expr: Expr) -> Stmt {
+        new_stmt(StmtData::Return {
+            expr: expr.as_box(),
+        })
+    }
+
     /// Creates a new while statement.
     pub fn new_while_stmt(condition: Expr, body: Stmt) -> Stmt {
         new_stmt(StmtData::While {
