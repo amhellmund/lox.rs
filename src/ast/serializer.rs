@@ -208,6 +208,9 @@ impl AstTopologicalSerializer {
             StmtData::Print { expr } => {
                 self.generate_ast_serialization("print", loc, vec![sub_ser.serialize_expr(expr)])
             }
+            StmtData::Return { expr } => {
+                self.generate_ast_serialization("return", loc, vec![sub_ser.serialize_expr(expr)])
+            }
             StmtData::VarDecl {
                 identifier,
                 init_expr,

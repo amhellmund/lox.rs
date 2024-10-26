@@ -76,6 +76,9 @@ pub enum StmtData {
     Print {
         expr: Box<Expr>,
     },
+    Return {
+        expr: Box<Expr>,
+    },
     VarDecl {
         identifier: String,
         init_expr: Box<Expr>,

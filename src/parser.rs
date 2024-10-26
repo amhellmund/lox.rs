@@ -192,6 +192,7 @@ impl Parser {
     /// Parses variable declaration.
     ///
     /// Grammar rule:
+    ///
     ///   variable_declaration: 'var' 'identifer'
     ///                       | 'var' 'identifier' '=' expression ';'
     ///
@@ -225,6 +226,7 @@ impl Parser {
     /// Parses a function declaration
     ///
     /// Grammar rule:
+    ///
     ///   function_declaration: 'fun' 'identifier' '(' parameters? ')' block
     ///
     /// This function assumes that the 'fun' token has not yet been consumed.
@@ -261,19 +263,41 @@ impl Parser {
     ///
     /// Grammar rule:
     ///
-    ///   statement: print_statement
-    ///            | expression_statement
-    ///            | block_statement
+    ///   statement: expression_statement
     ///            | if_statement
+    ///            | block_statement
+    ///            | print_statement
+    ///            | return statement          
     ///            | while_statement
     fn parse_statement(&mut self) -> Result<Stmt> {
         match self.tokens.current().token_type {
-            TokenType::Print => self.parse_print_statement(),
-            TokenType::LeftBrace => self.parse_block_statement(),
             TokenType::If => self.parse_if_statement(),
+            TokenType::LeftBrace => self.parse_block_statement(),
+            TokenType::Print => self.parse_print_statement(),
+            TokenType::Return => self.parse_return_statement(),
             TokenType::While => self.parse_while_statement(),
             _ => self.parse_expression_statement(),
         }
+    }
+
+    /// Parses a return statement.
+    ///
+    /// Grammar rule:
+    ///
+    ///   return_statement: 'return' expression ';'
+    ///
+    /// This function assumes that the 'return' token has not yet been consumed.
+    fn parse_return_statement(&mut self) -> Result<Stmt> {
+        let return_token = self.consume_or_error(TokenType::Return)?;
+        let expr = self.parse_expression()?;
+        let semicolon_token = self.consume_or_error(TokenType::Semicolon)?;
+
+        Ok(Stmt::new(
+            StmtData::Return {
+                expr: expr.as_box(),
+            },
+            LocationSpan::new(return_token.location, semicolon_token.location),
+        ))
     }
 
     /// Parses a print statement.

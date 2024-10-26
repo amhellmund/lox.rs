@@ -154,6 +154,9 @@ impl<'a, W: Write> Interpreter<'a, W> {
                         .write_fmt(format_args!("{}\n", expr_value.to_string()))?;
                 }
             }
+            StmtData::Return { expr } => {
+                self.interpret_expr(expr)?;
+            }
             StmtData::VarDecl {
                 identifier,
                 init_expr,

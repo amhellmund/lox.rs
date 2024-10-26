@@ -1,0 +1,8 @@
+// function<test>
+// ffi<clock>
+// ffi<read_stdin>
+fun test () {}
+
+print test;
+print std_clock;
+print std_read_stdin;
