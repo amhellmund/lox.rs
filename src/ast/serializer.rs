@@ -156,6 +156,18 @@ impl AstTopologicalSerializer {
         ))]
     }
 
+    /// Generates serialized output for function parameters/arguments
+    fn generate_ast_serialization_for_params(
+        &self,
+        tag: &str,
+        parameters: &Vec<String>,
+    ) -> Vec<String> {
+        parameters
+            .iter()
+            .map(|param| self.get_indented(format!("({} {})", tag, param)))
+            .collect()
+    }
+
     fn serialize_stmt(&self, stmt: &Stmt) -> Vec<String> {
         // statements and expressions on the inner level get serialized by this instance
         let sub_ser = self.new_inner_serializer();
@@ -164,6 +176,19 @@ impl AstTopologicalSerializer {
             StmtData::Block { statements } => self.serialize_stmt_list("block", loc, statements),
             StmtData::Expr { expr } => {
                 self.generate_ast_serialization("expr", loc, vec![sub_ser.serialize_expr(expr)])
+            }
+            StmtData::FunctionDecl {
+                name,
+                parameters,
+                block,
+            } => {
+                let mut subentries = vec![
+                    sub_ser.serialize_name(name),
+                    sub_ser.generate_ast_serialization_for_params("param", parameters),
+                ];
+                subentries.push(sub_ser.serialize_stmt_list("block", loc, block));
+
+                self.generate_ast_serialization("func-decl", loc, subentries)
             }
             StmtData::If {
                 condition,
@@ -278,9 +303,10 @@ pub mod tests {
     use crate::ast::{
         tests::{
             new_assign_expr, new_binary_expr, new_block_stmt, new_boolean_literal_expr,
-            new_expr_stmt, new_grouping_expr, new_if_else_stmt, new_if_stmt, new_literal_expr,
-            new_number_literal_expr, new_print_stmt, new_string_literal_expr, new_unary_expr,
-            new_var_decl_stmt, new_variable_expr, new_while_stmt,
+            new_expr_stmt, new_function_decl_stmt, new_grouping_expr, new_if_else_stmt,
+            new_if_stmt, new_literal_expr, new_number_literal_expr, new_print_stmt,
+            new_string_literal_expr, new_unary_expr, new_var_decl_stmt, new_variable_expr,
+            new_while_stmt,
         },
         BinaryOperator, Expr, Literal, Stmt, UnaryOperator,
     };
@@ -321,7 +347,7 @@ pub mod tests {
     macro_rules! assert_serialized {
         ($stmt:expr, $expected:expr) => {
             let output = serialize(&$stmt, false);
-            assert_eq!(output, $expected);
+            pretty_assertions::assert_eq!(output, $expected);
         };
     }
 
@@ -348,6 +374,33 @@ pub mod tests {
                   (number 0)
                 )
             "#,
+            )
+        );
+    }
+
+    #[test]
+    fn test_stmt_func_declaration() {
+        assert_serialized!(
+            new_function_decl_stmt(
+                "func",
+                vec!["a", "b", "c"],
+                vec![new_var_decl_stmt("id", new_number_literal_expr(0))]
+            ),
+            dedent(
+                r#"
+                (func-decl
+                  func
+                  (param a)
+                  (param b)
+                  (param c)
+                  (block
+                    (var-decl
+                      id
+                      (number 0)
+                    )
+                  )
+                )
+                "#
             )
         );
     }

@@ -177,10 +177,13 @@ impl Parser {
     /// Grammar rule:
     ///
     ///   declaration: variable_declaration
+    ///              | function_declaration
     ///              | statement
     fn parse_declaration(&mut self) -> Result<Stmt> {
-        if self.tokens.current_has_token_type(&[TokenType::Var]) {
+        if self.current_has_token_type(TokenType::Var) {
             self.parse_variable_declaration()
+        } else if self.current_has_token_type(TokenType::Fun) {
+            self.parse_function_declaration()
         } else {
             self.parse_statement()
         }
@@ -216,6 +219,40 @@ impl Parser {
                 init_expr: init_expr.as_box(),
             },
             LocationSpan::new(var_token.location, semicolon_token.location),
+        ))
+    }
+
+    /// Parses a function declaration
+    ///
+    /// Grammar rule:
+    ///   function_declaration: 'fun' 'identifier' '(' parameters? ')' block
+    ///
+    /// This function assumes that the 'fun' token has not yet been consumed.
+    fn parse_function_declaration(&mut self) -> Result<Stmt> {
+        let fun_token = self.consume_or_error(TokenType::Fun)?;
+        let identifier = self.consume_or_error(TokenType::Identifier)?;
+        let _ = self.consume_or_error(TokenType::LeftParanthesis)?;
+
+        let mut parameters = Vec::<String>::new();
+        if !self.current_has_token_type(TokenType::RightParanthesis) {
+            loop {
+                let param = self.consume_or_error(TokenType::Identifier)?;
+                parameters.push(param.lexeme.clone());
+                if !self.current_has_token_type(TokenType::Comma) {
+                    break;
+                }
+            }
+        }
+        let _ = self.consume_or_error(TokenType::RightParanthesis)?;
+        let (block_statements, block_loc) = self.parse_block()?;
+
+        Ok(Stmt::new(
+            StmtData::FunctionDecl {
+                name: identifier.lexeme.clone(),
+                parameters,
+                block: block_statements,
+            },
+            LocationSpan::new(fun_token.location, block_loc.end_inclusive),
         ))
     }
 
@@ -651,9 +688,10 @@ mod tests {
             serializer::tests::{serialize_expr, serialize_stmt},
             tests::{
                 new_assign_expr, new_binary_expr, new_block_stmt, new_expr_stmt,
-                new_function_call_expr, new_grouping_expr, new_if_else_stmt, new_if_stmt,
-                new_literal_expr, new_number_literal_expr, new_print_stmt, new_string_literal_expr,
-                new_unary_expr, new_var_decl_stmt, new_variable_expr, new_while_stmt,
+                new_function_call_expr, new_function_decl_stmt, new_grouping_expr,
+                new_if_else_stmt, new_if_stmt, new_literal_expr, new_number_literal_expr,
+                new_print_stmt, new_string_literal_expr, new_unary_expr, new_var_decl_stmt,
+                new_variable_expr, new_while_stmt,
             },
             BinaryOperator, ExprData, StmtData, UnaryOperator,
         },
@@ -996,6 +1034,21 @@ mod tests {
         for tokens in test_data {
             assert!(parse_decl(tokens).is_err());
         }
+    }
+
+    #[test]
+    fn test_function_declaration_statement_no_parameters() {
+        parse_decl_and_check!(
+            token_seq!(
+                TokenType::Fun,
+                TokenType::Identifier,
+                TokenType::LeftParanthesis,
+                TokenType::RightParanthesis,
+                TokenType::LeftBrace,
+                TokenType::RightBrace,
+            ),
+            new_function_decl_stmt("id", vec![], vec![])
+        );
     }
 
     #[test]

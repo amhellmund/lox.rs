@@ -60,6 +60,11 @@ pub enum StmtData {
     Expr {
         expr: Box<Expr>,
     },
+    FunctionDecl {
+        name: String,
+        parameters: Vec<String>,
+        block: Vec<Stmt>,
+    },
     If {
         condition: Box<Expr>,
         if_statement: Box<Stmt>,
@@ -270,6 +275,19 @@ pub mod tests {
         new_stmt(StmtData::VarDecl {
             identifier: identifier.to_string(),
             init_expr: init_expr.as_box(),
+        })
+    }
+
+    /// Creates a new function declaration statement.
+    pub fn new_function_decl_stmt(
+        identifier: &str,
+        parameters: Vec<&str>,
+        block: Vec<Stmt>,
+    ) -> Stmt {
+        new_stmt(StmtData::FunctionDecl {
+            name: String::from(identifier),
+            parameters: parameters.iter().map(|param| param.to_string()).collect(),
+            block: block,
         })
     }
 

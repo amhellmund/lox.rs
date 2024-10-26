@@ -111,7 +111,6 @@ impl<'a, W: Write> Interpreter<'a, W> {
 
     pub fn interpret(&mut self, stmt: &Stmt) -> Result<()> {
         match stmt.get_data() {
-            StmtData::List { statements, .. } => self.interpret_stmts(statements)?,
             StmtData::Block { statements, .. } => {
                 // Errors when executing statements shall not be propagated as is, because
                 // the scope must get cleaned up properly at the end of the block.
@@ -120,25 +119,14 @@ impl<'a, W: Write> Interpreter<'a, W> {
                 self.env.drop_innermost_lexical_scope();
                 return result;
             }
-            StmtData::VarDecl {
-                identifier,
-                init_expr,
-                ..
-            } => {
-                let expr_value = self.interpret_expr(init_expr)?;
-                self.env.define_variable(identifier, expr_value);
-            }
             StmtData::Expr { expr, .. } => {
                 self.interpret_expr(&expr)?;
             }
-            StmtData::Print { expr, .. } => {
-                let expr_value = self.interpret_expr(expr)?;
-                if let Some(writer) = self.output_writer.clone() {
-                    writer
-                        .borrow_mut()
-                        .write_fmt(format_args!("{}\n", expr_value.to_string()))?;
-                }
-            }
+            StmtData::FunctionDecl {
+                name,
+                parameters,
+                block,
+            } => todo!(),
             StmtData::If {
                 condition,
                 if_statement,
@@ -151,6 +139,23 @@ impl<'a, W: Write> Interpreter<'a, W> {
                 } else if let Some(else_statement) = else_statement {
                     self.interpret(&else_statement)?;
                 }
+            }
+            StmtData::List { statements, .. } => self.interpret_stmts(statements)?,
+            StmtData::Print { expr, .. } => {
+                let expr_value = self.interpret_expr(expr)?;
+                if let Some(writer) = self.output_writer.clone() {
+                    writer
+                        .borrow_mut()
+                        .write_fmt(format_args!("{}\n", expr_value.to_string()))?;
+                }
+            }
+            StmtData::VarDecl {
+                identifier,
+                init_expr,
+                ..
+            } => {
+                let expr_value = self.interpret_expr(init_expr)?;
+                self.env.define_variable(identifier, expr_value);
             }
             StmtData::While {
                 condition, body, ..
