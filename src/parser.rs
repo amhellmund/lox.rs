@@ -241,6 +241,7 @@ impl Parser {
                 if !self.current_has_token_type(TokenType::Comma) {
                     break;
                 }
+                self.consume_or_error(TokenType::Comma)?;
             }
         }
         let _ = self.consume_or_error(TokenType::RightParanthesis)?;
@@ -1048,6 +1049,35 @@ mod tests {
                 TokenType::RightBrace,
             ),
             new_function_decl_stmt("id", vec![], vec![])
+        );
+    }
+
+    #[test]
+    fn test_function_declaration_statement_with_parameters_and_body() {
+        parse_decl_and_check!(
+            token_seq!(
+                TokenType::Fun,
+                TokenType::Identifier,
+                TokenType::LeftParanthesis,
+                TokenType::Identifier,
+                TokenType::Comma,
+                TokenType::Identifier,
+                TokenType::RightParanthesis,
+                TokenType::LeftBrace,
+                TokenType::Identifier,
+                TokenType::Equal,
+                TokenType::Number,
+                TokenType::Semicolon,
+                TokenType::RightBrace
+            ),
+            new_function_decl_stmt(
+                "id",
+                vec!["id", "id"],
+                vec![new_expr_stmt(new_assign_expr(
+                    "id",
+                    new_number_literal_expr(1)
+                ))]
+            )
         );
     }
 
