@@ -126,7 +126,12 @@ impl<'a, W: Write> Interpreter<'a, W> {
                 name,
                 parameters,
                 block,
-            } => todo!(),
+            } => {
+                self.env.define_variable(
+                    name,
+                    ExprValue::Function(Function::new(name, parameters, block, &self.env)),
+                );
+            }
             StmtData::If {
                 condition,
                 if_statement,
@@ -209,12 +214,10 @@ impl<'a, W: Write> Interpreter<'a, W> {
                 let callee_value = self.interpret_expr(callee)?;
                 match callee_value {
                     ExprValue::Function(function) => {
-                        let name = function.get_name();
-                        self.interpret_function_call(&function, name, arguments, loc)
+                        self.interpret_function_call(&function, arguments, loc)
                     }
                     ExprValue::NativeFunction(native_function) => {
-                        let name = native_function.get_name();
-                        self.interpret_function_call(&native_function, name, arguments, loc)
+                        self.interpret_function_call(&native_function, arguments, loc)
                     }
                     _ => Err(emit_diagnostic(
                         format!(
@@ -231,7 +234,6 @@ impl<'a, W: Write> Interpreter<'a, W> {
     fn interpret_function_call<T: Callable>(
         &mut self,
         callable: &T,
-        name: String,
         arguments: &Vec<Expr>,
         loc: &LocationSpan,
     ) -> Result<ExprValue> {
@@ -239,7 +241,7 @@ impl<'a, W: Write> Interpreter<'a, W> {
             Err(emit_diagnostic(
                 format!(
                     "Function arguments mistmatch for '{}': expected {}, got {}",
-                    name,
+                    callable.get_name(),
                     callable.get_function_arity(),
                     arguments.len()
                 ),
@@ -466,9 +468,10 @@ mod tests {
     use crate::ast::interpreter::{interpret, Interpreter};
     use crate::ast::tests::{
         new_assign_expr, new_binary_expr, new_boolean_literal_expr, new_expr_stmt,
-        new_function_call_expr, new_grouping_expr, new_if_else_stmt, new_if_stmt, new_list_stmt,
-        new_literal_expr, new_number_literal_expr, new_print_stmt, new_string_literal_expr,
-        new_unary_expr, new_var_decl_stmt, new_variable_expr, new_while_stmt,
+        new_function_call_expr, new_function_decl_stmt, new_grouping_expr, new_if_else_stmt,
+        new_if_stmt, new_list_stmt, new_literal_expr, new_number_literal_expr, new_print_stmt,
+        new_string_literal_expr, new_unary_expr, new_var_decl_stmt, new_variable_expr,
+        new_while_stmt,
     };
     use crate::ast::{BinaryOperator, Expr, Literal, UnaryOperator};
 
@@ -923,5 +926,26 @@ mod tests {
             "id",
             ExprValue::Number(10.0)
         );
+    }
+
+    #[test]
+    fn test_function_call_with_parameters() {
+        let stmt = new_list_stmt(vec![
+            new_function_decl_stmt(
+                "test",
+                vec!["a", "b"],
+                vec![new_print_stmt(new_binary_expr(
+                    BinaryOperator::Add,
+                    new_variable_expr("a"),
+                    new_variable_expr("b"),
+                ))],
+            ),
+            new_expr_stmt(new_function_call_expr(
+                new_variable_expr("test"),
+                vec![new_number_literal_expr(1), new_number_literal_expr(2)],
+            )),
+        ]);
+        let mut interpreter = new_test_interpreter();
+        interpreter.interpret(&stmt).unwrap();
     }
 }

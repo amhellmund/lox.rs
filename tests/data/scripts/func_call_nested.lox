@@ -1,0 +1,11 @@
+// 1
+// "a"
+fun parent (a) {
+    fun child (a) {
+        print a;
+    }
+    child(a);
+}
+
+parent(1);
+parent("a");

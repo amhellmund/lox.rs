@@ -1,19 +1,10 @@
-// Fibonacci
-
-var a = 0;
-var temp = nil;
-var b = 1;
-
-while (a < 10000) {
-  print a;
-  temp = a;
-  a = b;
-  b = temp + b;
+fun printit (a, b) {
+  var i = 2;
+  fun close (a) {
+    print a + i;
+  } 
+  
+  print close(a);
 }
 
-var start = std_clock();
-var end = std_clock();
-print end - start;
-
-var in = std_read_stdin();
-print in;
+printit(1,2);

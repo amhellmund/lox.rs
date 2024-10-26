@@ -80,6 +80,11 @@ impl Callable for NativeFunction {
         arguments: Vec<ExprValue>,
         _: &mut Interpreter<'a, W>,
     ) -> Result<ExprValue> {
+        assert_eq!(
+            arguments.len(),
+            self.get_function_arity() as usize,
+            "Argument count mismatch"
+        );
         let (_, _, callback) = self.get_execution_info();
         callback(arguments)
     }
@@ -88,9 +93,25 @@ impl Callable for NativeFunction {
 #[derive(PartialEq, Debug, Clone)]
 pub struct Function {
     name: String,
-    arity: i64,
-    block: Stmt,
-    environment: ExecutionEnvironment,
+    parameters: Vec<String>,
+    block: Vec<Stmt>,
+    closure_environment: ExecutionEnvironment,
+}
+
+impl Function {
+    pub fn new(
+        name: &String,
+        parameters: &Vec<String>,
+        block: &Vec<Stmt>,
+        closure_environment: &ExecutionEnvironment,
+    ) -> Self {
+        Function {
+            name: name.clone(),
+            parameters: parameters.clone(),
+            block: block.clone(),
+            closure_environment: closure_environment.clone(),
+        }
+    }
 }
 
 impl Callable for Function {
@@ -99,16 +120,27 @@ impl Callable for Function {
     }
 
     fn get_function_arity(&self) -> i64 {
-        self.arity
+        self.parameters.len() as i64
     }
 
     fn call<'a, W: Write>(
         &self,
-        _: Vec<ExprValue>,
+        arguments: Vec<ExprValue>,
         interpreter: &mut Interpreter<'a, W>,
     ) -> Result<ExprValue> {
-        let mut new_interpreter = interpreter.with_new_env(self.environment.clone());
-        new_interpreter.interpret(&self.block)?;
+        assert_eq!(
+            arguments.len(),
+            self.parameters.len(),
+            "Argument count mismatch"
+        );
+        let mut new_environment = self.closure_environment.clone_with_keeping_scopes();
+        new_environment.create_lexical_scope();
+        for i in 0..arguments.len() {
+            new_environment.define_variable(&self.parameters[i], arguments[i].clone());
+        }
+        let mut new_interpreter = interpreter.with_new_env(new_environment);
+        new_interpreter.interpret_stmts(&self.block)?;
+        // the new environment gets dropped and therefore also the innermost scope
         Ok(ExprValue::Nil)
     }
 }
