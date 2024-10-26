@@ -1,0 +1,10 @@
+// 30
+fun parent (a) {
+    var i = a;
+    fun child (a) {
+        return a + i;
+    }
+    return child;
+}
+
+print parent(10)(20);

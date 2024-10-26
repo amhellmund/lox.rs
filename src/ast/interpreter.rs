@@ -13,7 +13,7 @@ mod function;
 
 use std::{cell::RefCell, io::Write, path::PathBuf, rc::Rc};
 
-use anyhow::Result;
+use anyhow::{Ok, Result};
 use environment::ExecutionEnvironment;
 use function::{Callable, Function, NativeFunction};
 
@@ -23,6 +23,21 @@ use crate::{
 };
 
 use super::{BinaryOperator, ExprData, Stmt, StmtData, UnaryOperator};
+
+/// Result of evaluating an stmt node of the AST.
+///
+/// Statements in Lox do not have a value per language definition.
+/// The statement value is however used to encode a return value within the execution
+/// of a statement. If the value is `None`, there was no return value, otherwise, there
+/// was an expression value.
+///
+/// Note: the semantics of this enum is the same as Option, but a dedicated enum is
+/// nevertheless chosen to be symmetric to expressions.
+#[derive(PartialEq, Debug, Clone)]
+pub enum StmtValue {
+    Expr(ExprValue),
+    None,
+}
 
 /// Result of evaluating an expression node of the AST.
 #[derive(PartialEq, Debug, Clone)]
@@ -74,7 +89,22 @@ pub fn interpret<'a, W: Write>(
     output_writer: Option<Rc<RefCell<&'a mut W>>>,
 ) -> Result<()> {
     let mut interpreter = Interpreter::new(source_file, output_writer);
-    interpreter.interpret(stmt)
+    interpreter.interpret(stmt)?;
+    Ok(())
+}
+
+macro_rules! handle_early_return {
+    ($interpreter:expr, $stmt:expr) => {
+        let return_value = $interpreter.interpret($stmt);
+        // Early return logic to take into account return statements.
+        if return_value.is_err() {
+            return return_value;
+        } else {
+            if let StmtValue::Expr(expr) = return_value.unwrap() {
+                return Ok(StmtValue::Expr(expr));
+            }
+        }
+    };
 }
 
 /// Runtime interpreter for Lox.
@@ -109,7 +139,7 @@ impl<'a, W: Write> Interpreter<'a, W> {
         }
     }
 
-    pub fn interpret(&mut self, stmt: &Stmt) -> Result<()> {
+    pub fn interpret(&mut self, stmt: &Stmt) -> Result<StmtValue> {
         match stmt.get_data() {
             StmtData::Block { statements, .. } => {
                 // Errors when executing statements shall not be propagated as is, because
@@ -140,12 +170,14 @@ impl<'a, W: Write> Interpreter<'a, W> {
             } => {
                 let cond_value = self.interpret_expr(condition)?;
                 if Self::is_truthy(&cond_value) {
-                    self.interpret(if_statement)?;
+                    return self.interpret(if_statement);
                 } else if let Some(else_statement) = else_statement {
-                    self.interpret(&else_statement)?;
+                    return self.interpret(&else_statement);
                 }
             }
-            StmtData::List { statements, .. } => self.interpret_stmts(statements)?,
+            StmtData::List { statements, .. } => {
+                return self.interpret_stmts(statements);
+            }
             StmtData::Print { expr, .. } => {
                 let expr_value = self.interpret_expr(expr)?;
                 if let Some(writer) = self.output_writer.clone() {
@@ -154,9 +186,7 @@ impl<'a, W: Write> Interpreter<'a, W> {
                         .write_fmt(format_args!("{}\n", expr_value.to_string()))?;
                 }
             }
-            StmtData::Return { expr } => {
-                self.interpret_expr(expr)?;
-            }
+            StmtData::Return { expr } => return Ok(StmtValue::Expr(self.interpret_expr(expr)?)),
             StmtData::VarDecl {
                 identifier,
                 init_expr,
@@ -169,17 +199,17 @@ impl<'a, W: Write> Interpreter<'a, W> {
                 condition, body, ..
             } => {
                 while Self::is_truthy(&self.interpret_expr(condition)?) {
-                    self.interpret(body)?;
+                    handle_early_return!(self, body);
                 }
             }
         }
-        Ok(())
+        Ok(StmtValue::None)
     }
-    fn interpret_stmts(&mut self, statements: &Vec<Stmt>) -> Result<()> {
+    fn interpret_stmts(&mut self, statements: &Vec<Stmt>) -> Result<StmtValue> {
         for stmt in statements {
-            self.interpret(stmt)?
+            handle_early_return!(self, stmt);
         }
-        Ok(())
+        Ok(StmtValue::None)
     }
 
     /// Evaluates the `Expr` node of the AST into an `ExprValue`.

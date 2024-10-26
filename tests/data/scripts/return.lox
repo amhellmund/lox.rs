@@ -1,0 +1,6 @@
+// 12
+fun retval (a) {
+    return a + 2;
+}
+
+print retval(10);

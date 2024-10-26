@@ -9,7 +9,7 @@
 //!   o Regular Lox functions represented by a `Stmt`
 //!   o Foreign/native functions (FFI)
 
-use crate::ast::Stmt;
+use crate::ast::{interpreter::StmtValue, Stmt};
 use anyhow::Result;
 
 use super::{environment::ExecutionEnvironment, ExprValue, Interpreter};
@@ -139,8 +139,11 @@ impl Callable for Function {
             new_environment.define_variable(&self.parameters[i], arguments[i].clone());
         }
         let mut new_interpreter = interpreter.with_new_env(new_environment);
-        new_interpreter.interpret_stmts(&self.block)?;
+        let return_value = new_interpreter.interpret_stmts(&self.block)?;
         // the new environment gets dropped and therefore also the innermost scope
-        Ok(ExprValue::Nil)
+        return Ok(match return_value {
+            StmtValue::Expr(expr) => expr,
+            StmtValue::None => ExprValue::Nil,
+        });
     }
 }

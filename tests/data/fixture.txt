@@ -3,8 +3,10 @@ tests/data/scripts/compute.lox
 tests/data/scripts/func_as_value.lox
 tests/data/scripts/func_call.lox
 tests/data/scripts/func_call_nested.lox
+tests/data/scripts/func_with_closure.lox
 tests/data/scripts/if.lox
 tests/data/scripts/print.lox
+tests/data/scripts/return.lox
 tests/data/scripts/std_clock.lox
 tests/data/scripts/string.lox
 tests/data/scripts/while.lox
