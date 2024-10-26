@@ -461,9 +461,9 @@ mod tests {
     use crate::ast::interpreter::{interpret, Interpreter};
     use crate::ast::tests::{
         new_assign_expr, new_binary_expr, new_boolean_literal_expr, new_expr_stmt,
-        new_grouping_expr, new_if_else_stmt, new_if_stmt, new_list_stmt, new_literal_expr,
-        new_number_literal_expr, new_print_stmt, new_string_literal_expr, new_unary_expr,
-        new_var_decl_stmt, new_variable_expr, new_while_stmt,
+        new_function_call_expr, new_grouping_expr, new_if_else_stmt, new_if_stmt, new_list_stmt,
+        new_literal_expr, new_number_literal_expr, new_print_stmt, new_string_literal_expr,
+        new_unary_expr, new_var_decl_stmt, new_variable_expr, new_while_stmt,
     };
     use crate::ast::{BinaryOperator, Expr, Literal, UnaryOperator};
 
@@ -499,11 +499,15 @@ mod tests {
     /// Tests for Expressions ///
     /////////////////////////////
 
+    fn interpret_expr(expr: &Expr) -> ExprValue {
+        let mut interpreter = new_test_interpreter();
+        interpreter.interpret_expr(&expr).unwrap()
+    }
+
     macro_rules! interpret_expr_and_check {
         ($test_data:expr) => {
             for (expr, expected_value) in $test_data {
-                let mut interpreter = new_test_interpreter();
-                let value = interpreter.interpret_expr(&expr).unwrap();
+                let value = interpret_expr(&expr);
                 assert_eq!(value, expected_value);
             }
         };
@@ -666,6 +670,16 @@ mod tests {
         )];
 
         interpret_expr_and_check!(test_data);
+    }
+
+    #[test]
+    fn test_function_call_ffi() {
+        let expr = new_function_call_expr(new_variable_expr("std_clock"), vec![]);
+        let value = interpret_expr(&expr);
+        match value {
+            ExprValue::Number(time) => assert!(time > 0.),
+            _ => panic!("Invalid value type"),
+        }
     }
 
     #[test]
