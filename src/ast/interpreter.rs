@@ -503,8 +503,8 @@ mod tests {
         new_assign_expr, new_binary_expr, new_boolean_literal_expr, new_expr_stmt,
         new_function_call_expr, new_function_decl_stmt, new_grouping_expr, new_if_else_stmt,
         new_if_stmt, new_list_stmt, new_literal_expr, new_number_literal_expr, new_print_stmt,
-        new_string_literal_expr, new_unary_expr, new_var_decl_stmt, new_variable_expr,
-        new_while_stmt,
+        new_return_stmt, new_string_literal_expr, new_unary_expr, new_var_decl_stmt,
+        new_variable_expr, new_while_stmt,
     };
     use crate::ast::{BinaryOperator, Expr, Literal, UnaryOperator};
 
@@ -962,23 +962,29 @@ mod tests {
     }
 
     #[test]
-    fn test_function_call_with_parameters() {
-        let stmt = new_list_stmt(vec![
-            new_function_decl_stmt(
-                "test",
-                vec!["a", "b"],
-                vec![new_print_stmt(new_binary_expr(
-                    BinaryOperator::Add,
-                    new_variable_expr("a"),
-                    new_variable_expr("b"),
-                ))],
-            ),
-            new_expr_stmt(new_function_call_expr(
-                new_variable_expr("test"),
-                vec![new_number_literal_expr(1), new_number_literal_expr(2)],
-            )),
-        ]);
-        let mut interpreter = new_test_interpreter();
-        interpreter.interpret(&stmt).unwrap();
+    fn test_function_call_with_parameters_and_return_value() {
+        interpret_stmt_and_check_var_value!(
+            new_list_stmt(vec![
+                new_function_decl_stmt(
+                    "test",
+                    vec!["a", "b"],
+                    vec![new_return_stmt(new_binary_expr(
+                        BinaryOperator::Add,
+                        new_variable_expr("a"),
+                        new_variable_expr("b"),
+                    ))],
+                ),
+                new_expr_stmt(new_assign_expr(
+                    "i",
+                    new_function_call_expr(
+                        new_variable_expr("test"),
+                        vec![new_number_literal_expr(1), new_number_literal_expr(2)],
+                    ),
+                )),
+            ]),
+            vec![("i", ExprValue::Nil)],
+            "i",
+            ExprValue::Number(3.0)
+        );
     }
 }
