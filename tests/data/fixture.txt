@@ -4,6 +4,7 @@ tests/data/scripts/func_as_value.lox
 tests/data/scripts/func_call.lox
 tests/data/scripts/func_call_nested.lox
 tests/data/scripts/func_with_closure.lox
+tests/data/scripts/global_return.lox
 tests/data/scripts/if.lox
 tests/data/scripts/nested_return.lox
 tests/data/scripts/print.lox
