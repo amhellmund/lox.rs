@@ -3,6 +3,19 @@
 Rust implementation for the Lox language (from [Crafting Interpreters](https://craftinginterpreters.com/)).
 
 
+## Supported Features
+
+* Data Types: boolean, number, string, nil 
+* Expressions: binary, unary, comparision
+* Statements: if, print, return, while
+* Declarations: functions (with closures), variables
+* Native Functions (FFI): clock, read_stdin
+
+### Missing Features
+
+* Classes (with inheritance)
+
+
 ## Execution
 
 There are currently three possibilities:
